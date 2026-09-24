@@ -61,6 +61,13 @@ const HEPBURN: Record<string, string> = {
   ra: "ら", ri: "り", ru: "る", re: "れ", ro: "ろ",
   rya: "りゃ", ryu: "りゅ", ryo: "りょ",
   wa: "わ", wo: "を",
+  // Combinações que só existem em empréstimos (フォーク, ファイル). Ficam em
+  // hiragana aqui porque a comparação normaliza tudo para hiragana; `ティ` e
+  // `ディ` ficaram de fora porque seu romaji ("ti", "di") colide com as formas
+  // Kunrei que a tabela recusa de propósito.
+  fa: "ふぁ", fi: "ふぃ", fe: "ふぇ", fo: "ふぉ",
+  va: "ゔぁ", vi: "ゔぃ", vu: "ゔ", ve: "ゔぇ", vo: "ゔぉ",
+  we: "うぇ", wi: "うぃ",
 };
 
 /** Macrons e circunflexos: `kōhī` é a mesma coisa que `koohii`. */
