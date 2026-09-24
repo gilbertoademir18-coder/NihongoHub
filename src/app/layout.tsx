@@ -51,6 +51,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="pt-BR"
       className={`${inter.variable} h-full antialiased`}
+      // Extensões de navegador injetam classes e atributos em <html> antes do
+      // React hidratar, e cada uma gera um aviso de mismatch que não diz
+      // respeito ao nosso código. A supressão vale só para este elemento —
+      // mismatches dentro da árvore continuam sendo reportados.
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans">
         <ServiceWorkerRegistrar />
