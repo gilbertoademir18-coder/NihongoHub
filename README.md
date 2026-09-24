@@ -129,8 +129,10 @@ quatro botões.
 
 **Digitar** — a sessão inteira se faz no teclado, sem clicar em nada. A
 resposta é conferida **a cada tecla**: assim que o que você escreveu fecha a
-palavra (ou deixa de poder fechá-la), o resultado aparece e a próxima entra
-sozinha. Acertar vale "Bom", errar ou pedir a resposta vale "De novo".
+palavra (ou deixa de poder fechá-la), o resultado aparece — e fica na tela até
+você apertar `enter`, que traz a próxima. O ritmo é seu, e dá tempo de olhar a
+resposta certa quando o erro foi por pouco. Acertar vale "Bom", errar ou pedir
+a resposta vale "De novo".
 
 A conferência é por **prefixo**, não por tempo de espera: enquanto o kana já
 formado puder crescer até a resposta, nada acontece. Digitar `sakuna` para
@@ -140,13 +142,10 @@ aberto. Esperar você parar de digitar puniria quem pensa no meio da palavra.
 O campo mostra o kana se formando enquanto você digita, que é onde se aprende
 que `sha` é uma sílaba só e não três letras.
 
-`enter` confirma antes da hora, para quem prefere decidir que terminou. O
-botão "Não sei" mostra a resposta e espera você ler — ali não há avanço
-automático.
+Com a palavra ainda pela metade, `enter` confirma assim mesmo — para quem
+prefere decidir que terminou em vez de continuar digitando.
 
 Só Hepburn é aceito (`shi`, `chi`, `tsu`, `fu`) — ver `src/lib/romaji.ts`.
-O tempo que o resultado fica na tela é `MS_RESULTADO`, em
-`src/components/typing-session.tsx`.
 
 ### Rotação de lote
 
@@ -170,7 +169,8 @@ declaradas com motivo em `src/lib/kana.ts`: `を` só existe como partícula
 | --- | --- | --- |
 | `espaço` / `enter` | Mostrar a resposta | Revelar |
 | `1` `2` `3` `4` | De novo · Difícil · Bom · Fácil | Revelar |
-| (nenhuma) | A conferência e o avanço são automáticos | Digitar |
+| (nenhuma) | A conferência é automática, a cada tecla | Digitar |
+| `enter` | Ir para a próxima palavra | Digitar |
 | `enter` | Confirmar antes de completar a palavra | Digitar |
 
 ## Notas

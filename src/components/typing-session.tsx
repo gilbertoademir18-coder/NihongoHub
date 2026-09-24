@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { DetalhesRevisao } from "@/app/actions";
 import { SEPARADOR_LEITURAS } from "@/lib/kana";
 import {
@@ -19,13 +19,13 @@ import { SessionDone } from "./session-done";
  *
  * A sessão inteira se faz com o teclado. A resposta é conferida a cada tecla —
  * assim que o que foi escrito fecha a palavra, ou deixa de poder fechá-la, o
- * resultado aparece e a próxima palavra entra sozinha. Não há botão de
- * confirmar nem de avaliar: acertar de primeira vale "Bom", errar ou pedir a
- * resposta vale "De novo".
+ * resultado aparece. Ele fica na tela até você apertar enter, que é o que
+ * traz a próxima palavra: o ritmo é seu, e dá tempo de olhar a resposta certa
+ * quando o erro foi por pouco.
+ *
+ * Não há botão de confirmar nem de avaliar: acertar de primeira vale "Bom",
+ * errar ou pedir a resposta vale "De novo".
  */
-
-/** Quanto tempo o resultado fica na tela antes da próxima palavra. */
-const MS_RESULTADO = 400;
 
 type Resultado = "acertou" | "errou" | "revelado";
 
@@ -104,15 +104,6 @@ function Rodada({
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
   const campo = useRef<HTMLInputElement>(null);
-  const relogio = useRef<number | null>(null);
-
-  // O avanço automático precisa ser cancelado se a rodada sair de cena antes
-  // da hora — senão o temporizador dispara sobre um componente desmontado.
-  useEffect(() => {
-    return () => {
-      if (relogio.current !== null) window.clearTimeout(relogio.current);
-    };
-  }, []);
 
   // A primeira alternativa é a que aparece como resposta esperada; qualquer
   // uma delas é aceita na conferência.
@@ -129,12 +120,9 @@ function Rodada({
       resposta: acertou ? undefined : digitado,
     });
 
-    if (!gravou) {
-      setResultado(null);
-      return;
-    }
-
-    relogio.current = window.setTimeout(aoAvancar, MS_RESULTADO);
+    // Falhou ao gravar: volta ao estado de digitação para a pessoa tentar de
+    // novo, em vez de mostrar um resultado que não chegou ao banco.
+    if (!gravou) setResultado(null);
   }
 
   function aoDigitar(valor: string) {
@@ -152,8 +140,8 @@ function Rodada({
 
     setResultado("revelado");
     await aoResponder("again", { modo: "digitacao" });
-    // Aqui não há avanço automático: quem pediu a resposta precisa de tempo
-    // para lê-la, e é o enter que diz quando terminou.
+    // O foco volta ao campo para que o enter seguinte já avance, sem precisar
+    // clicar de novo depois de usar o botão.
     campo.current?.focus();
   }
 
@@ -164,14 +152,14 @@ function Rodada({
     if (evento.key !== "Enter") return;
     evento.preventDefault();
 
-    if (resultado === "revelado") {
+    // Com o resultado na tela, enter é o que traz a próxima palavra.
+    if (resultado !== null) {
       aoAvancar();
       return;
     }
-    if (resultado !== null) return;
 
     // Enter com a palavra ainda pela metade: vale como desistir da tentativa,
-    // para quem prefere confirmar em vez de esperar a conferência automática.
+    // para quem prefere confirmar em vez de continuar digitando.
     if (texto.trim().length > 0) {
       void registrar(verificarResposta(texto, card.reading).acertou, texto);
     }
@@ -258,16 +246,14 @@ function Rodada({
         </p>
       </div>
 
-      {resultado === "revelado" ? (
+      {mostrandoResposta ? (
         <button
           type="button"
           onClick={aoAvancar}
           className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
           Próxima
-          <span className="ml-2 hidden text-xs font-normal opacity-70 sm:inline">
-            enter
-          </span>
+          <span className="ml-2 text-xs font-normal opacity-70">enter</span>
         </button>
       ) : (
         <button
