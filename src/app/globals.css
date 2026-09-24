@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/*
+ * Paleta inspirada em tinta sumi sobre papel washi: fundo quente e quase sem
+ * saturação, para que o japonês — que é o conteúdo — seja a única coisa com
+ * contraste forte na tela.
+ */
+:root {
+  --background: #faf8f5;
+  --surface: #ffffff;
+  --surface-muted: #f2efe9;
+  --foreground: #1c1917;
+  --muted: #6b635c;
+  --border: #e3ded6;
+  --accent: #b23a48;
+  --accent-soft: #fdf2f3;
+  --indigo: #2f4858;
+  --success: #3f7d58;
+  --warning: #b5793a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #14120f;
+    --surface: #1e1b18;
+    --surface-muted: #262220;
+    --foreground: #f0ece6;
+    --muted: #a39a91;
+    --border: #322d29;
+    --accent: #e0707c;
+    --accent-soft: #2a1a1d;
+    --indigo: #8fb3c7;
+    --success: #6aa583;
+    --warning: #d9a161;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-indigo: var(--indigo);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+
+  --font-sans: var(--font-sans-latin), ui-sans-serif, system-ui, sans-serif;
+
+  /*
+   * Fontes japonesas do sistema, na ordem das plataformas-alvo:
+   * macOS/iOS, Windows, Android/Linux. Nenhuma é baixada — é o que mantém o
+   * app leve e faz o japonês renderizar mesmo sem rede.
+   */
+  --font-jp:
+    "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Yu Gothic",
+    Meiryo, "Noto Sans CJK JP", "Noto Sans JP", sans-serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/*
+ * Kanji em corpo pequeno viram borrão. Esta classe é usada em tudo que é
+ * japonês para dar respiro entre os traços.
+ */
+.jp {
+  font-family: var(--font-jp);
+  font-feature-settings: "palt" 1;
+  line-height: 1.7;
+}
+
+/* Respeita quem pediu menos movimento no sistema. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
