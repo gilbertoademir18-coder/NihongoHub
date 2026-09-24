@@ -153,6 +153,11 @@ aberto. Esperar você parar de digitar puniria quem pensa no meio da palavra.
 O campo mostra o kana se formando enquanto você digita, que é onde se aprende
 que `sha` é uma sílaba só e não três letras.
 
+**Errando, a palavra certa aparece e é preciso escrevê-la para seguir.** Essa
+digitação não gera outra revisão — a nota já foi dada — e existe para fixar a
+escrita no momento em que ela falhou, que é quando isso rende. O mesmo vale ao
+usar "Não sei". Acertando de primeira, passa direto.
+
 Com a palavra ainda pela metade, `enter` confirma assim mesmo — para quem
 prefere decidir que terminou em vez de continuar digitando.
 

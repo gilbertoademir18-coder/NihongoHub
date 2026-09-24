@@ -19,15 +19,23 @@ import { SessionDone } from "./session-done";
  *
  * A sessão inteira se faz com o teclado. A resposta é conferida a cada tecla —
  * assim que o que foi escrito fecha a palavra, ou deixa de poder fechá-la, o
- * resultado aparece. Ele fica na tela até você apertar enter, que é o que
- * traz a próxima palavra: o ritmo é seu, e dá tempo de olhar a resposta certa
- * quando o erro foi por pouco.
+ * resultado aparece. Ele fica na tela até o enter, que traz a próxima palavra:
+ * o ritmo é seu.
+ *
+ * Errando, ou pedindo a resposta, a palavra certa aparece e é **preciso
+ * escrevê-la** para seguir. Essa digitação não gera outra revisão — a nota já
+ * foi dada — e existe para fixar a escrita no momento em que ela falhou, que é
+ * quando isso vale alguma coisa.
  *
  * Não há botão de confirmar nem de avaliar: acertar de primeira vale "Bom",
  * errar ou pedir a resposta vale "De novo".
  */
 
-type Resultado = "acertou" | "errou" | "revelado";
+/**
+ * `digitando` é a tentativa; `corrigindo` é a cópia depois do erro; `pronto`
+ * é o estado em que o enter leva à próxima palavra.
+ */
+type Fase = "digitando" | "corrigindo" | "pronto";
 
 export function TypingSession({
   filaInicial,
@@ -123,7 +131,9 @@ function Rodada({
   aoAvancar: () => void;
 }) {
   const [texto, setTexto] = useState("");
-  const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [fase, setFase] = useState<Fase>("digitando");
+  /** Como foi a tentativa — o que decide a nota e a cor do resultado. */
+  const [acertou, setAcertou] = useState(false);
 
   const campo = useRef<HTMLInputElement>(null);
 
@@ -132,38 +142,53 @@ function Rodada({
   const leituraPrincipal = card.reading.split(SEPARADOR_LEITURAS)[0];
   const romajiEsperado = kanaParaRomaji(leituraPrincipal);
 
-  async function registrar(acertou: boolean, digitado: string) {
-    setResultado(acertou ? "acertou" : "errou");
+  /** Registra a tentativa. Só acontece uma vez por palavra. */
+  async function registrar(certo: boolean, digitado: string) {
+    setAcertou(certo);
+    setFase(certo ? "pronto" : "corrigindo");
+    if (!certo) setTexto("");
 
-    const gravou = await aoResponder(acertou ? "good" : "again", {
+    const gravou = await aoResponder(certo ? "good" : "again", {
       modo: "digitacao",
       // Só guardamos o que foi digitado quando saiu errado: é esse dado que
       // depois mostra quais confusões se repetem.
-      resposta: acertou ? undefined : digitado,
+      resposta: certo ? undefined : digitado,
     });
 
-    // Falhou ao gravar: volta ao estado de digitação para a pessoa tentar de
-    // novo, em vez de mostrar um resultado que não chegou ao banco.
-    if (!gravou) setResultado(null);
+    // Falhou ao gravar: volta a digitar, em vez de mostrar um resultado que
+    // não chegou ao banco.
+    if (!gravou) setFase("digitando");
   }
 
   function aoDigitar(valor: string) {
-    if (resultado !== null) return;
+    if (fase === "pronto") return;
     setTexto(valor);
 
-    // Confere a cada tecla: a palavra fechou, ou deixou de poder fechar.
     const estado = avaliarDigitacao(valor, card.reading);
+
+    // Copiando a resposta depois do erro: acertar aqui apenas libera o avanço.
+    // A nota já foi dada, e digitar certo agora não a melhora.
+    if (fase === "corrigindo") {
+      if (estado === "acertou") setFase("pronto");
+      else if (estado === "errou") setTexto("");
+      return;
+    }
+
+    // Tentativa: a palavra fechou, ou deixou de poder fechar.
     if (estado === "acertou") void registrar(true, valor);
     else if (estado === "errou") void registrar(false, valor);
   }
 
   async function revelar() {
-    if (resultado !== null || salvando) return;
+    if (fase !== "digitando" || salvando) return;
 
-    setResultado("revelado");
+    // Ver a resposta sem tentar conta como não saber — e ainda assim é preciso
+    // escrevê-la para seguir.
+    setAcertou(false);
+    setFase("corrigindo");
+    setTexto("");
+
     await aoResponder("again", { modo: "digitacao" });
-    // O foco volta ao campo para que o enter seguinte já avance, sem precisar
-    // clicar de novo depois de usar o botão.
     campo.current?.focus();
   }
 
@@ -174,11 +199,13 @@ function Rodada({
     if (evento.key !== "Enter") return;
     evento.preventDefault();
 
-    // Com o resultado na tela, enter é o que traz a próxima palavra.
-    if (resultado !== null) {
+    if (fase === "pronto") {
       aoAvancar();
       return;
     }
+
+    // Em correção o enter não adianta: a palavra certa precisa ser escrita.
+    if (fase === "corrigindo") return;
 
     // Enter com a palavra ainda pela metade: vale como desistir da tentativa,
     // para quem prefere confirmar em vez de continuar digitando.
@@ -187,8 +214,7 @@ function Rodada({
     }
   }
 
-  const acertou = resultado === "acertou";
-  const mostrandoResposta = resultado !== null;
+  const mostrandoResposta = fase !== "digitando";
 
   return (
     <>
@@ -215,6 +241,11 @@ function Rodada({
             </p>
             <p className="jp mt-1 text-2xl">{card.reading}</p>
             <p className="mt-0.5 text-sm text-muted">{romajiEsperado}</p>
+            {fase === "corrigindo" && (
+              <p className="mt-2 text-xs text-muted">
+                Escreva a palavra para continuar
+              </p>
+            )}
           </div>
         )}
       </article>
@@ -240,8 +271,10 @@ function Rodada({
           onKeyDown={aoTeclar}
           // `readOnly` em vez de `disabled`: o campo para de aceitar texto mas
           // mantém o foco, e a próxima palavra já entra pronta para digitar.
-          readOnly={mostrandoResposta}
-          placeholder="digite em romaji"
+          // Só trava quando não há mais nada a fazer além de avançar. Na
+          // correção o campo segue vivo — é nele que a palavra é fixada.
+          readOnly={fase === "pronto"}
+          placeholder={fase === "corrigindo" ? "escreva a resposta" : "digite em romaji"}
           // O teclado do celular sabota romaji: maiúscula automática no início
           // e autocorreção trocando "ka" por outra palavra.
           autoCapitalize="off"
@@ -253,7 +286,7 @@ function Rodada({
           // quebra: sem isto seria preciso clicar no campo a cada card.
           autoFocus
           className={`w-full rounded-lg border bg-surface px-4 py-3 text-center text-lg outline-none transition-colors ${
-            resultado === null
+            fase === "digitando"
               ? "border-border focus:border-accent"
               : acertou
                 ? "border-success"
@@ -262,29 +295,33 @@ function Rodada({
         />
 
         {/* Eco do kana enquanto digita: é aqui que se aprende que "sha" é uma
-            sílaba só, e não três letras. */}
+            sílaba só, e não três letras. Continua na correção, que é quando
+            copiar a palavra tem mais a ensinar. */}
         <p className="jp mt-2 h-6 text-center text-lg text-muted">
-          {mostrandoResposta ? "" : kanaParcial(texto)}
+          {fase === "pronto" ? "" : kanaParcial(texto)}
         </p>
       </div>
 
-      {mostrandoResposta ? (
+      {fase === "digitando" ? (
         <button
           type="button"
-          onClick={aoAvancar}
-          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          onClick={() => void revelar()}
+          disabled={salvando}
+          className="w-full rounded-lg border border-border bg-surface-muted px-4 py-3 text-sm font-semibold transition-colors hover:border-accent disabled:opacity-40"
         >
-          Próxima
-          <span className="ml-2 text-xs font-normal opacity-70">enter</span>
+          Não sei — exibir resposta
         </button>
       ) : (
         <button
           type="button"
-          onClick={() => void revelar()}
-          disabled={mostrandoResposta || salvando}
-          className="w-full rounded-lg border border-border bg-surface-muted px-4 py-3 text-sm font-semibold transition-colors hover:border-accent disabled:opacity-40"
+          onClick={aoAvancar}
+          // Em correção o avanço fica visível mas travado: é a palavra escrita
+          // que o destrava, não o clique.
+          disabled={fase === "corrigindo"}
+          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
         >
-          Não sei — exibir resposta
+          Próxima
+          <span className="ml-2 text-xs font-normal opacity-70">enter</span>
         </button>
       )}
     </>
