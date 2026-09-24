@@ -127,15 +127,26 @@ jeitos (`/study?deck=<id>&modo=digitacao`).
 **Revelar** — mostra o japonês, você revela a resposta e se auto-avalia em
 quatro botões.
 
-**Digitar** — mostra a palavra e você escreve o romaji. A nota é objetiva:
-acertar de primeira vale "Bom", errar ou pedir a resposta vale "De novo", sem
-botões. Errando, é preciso digitar a palavra certa para seguir — esse passo
-não gera outra revisão, ele existe para fixar a escrita.
+**Digitar** — a sessão inteira se faz no teclado, sem clicar em nada. A
+resposta é conferida **a cada tecla**: assim que o que você escreveu fecha a
+palavra (ou deixa de poder fechá-la), o resultado aparece e a próxima entra
+sozinha. Acertar vale "Bom", errar ou pedir a resposta vale "De novo".
+
+A conferência é por **prefixo**, não por tempo de espera: enquanto o kana já
+formado puder crescer até a resposta, nada acontece. Digitar `sakuna` para
+さくら reprova na hora — さくな não leva a さくら — enquanto `sakur` continua em
+aberto. Esperar você parar de digitar puniria quem pensa no meio da palavra.
 
 O campo mostra o kana se formando enquanto você digita, que é onde se aprende
 que `sha` é uma sílaba só e não três letras.
 
+`enter` confirma antes da hora, para quem prefere decidir que terminou. O
+botão "Não sei" mostra a resposta e espera você ler — ali não há avanço
+automático.
+
 Só Hepburn é aceito (`shi`, `chi`, `tsu`, `fu`) — ver `src/lib/romaji.ts`.
+O tempo que o resultado fica na tela é `MS_RESULTADO`, em
+`src/components/typing-session.tsx`.
 
 ### Rotação de lote
 
@@ -159,7 +170,8 @@ declaradas com motivo em `src/lib/kana.ts`: `を` só existe como partícula
 | --- | --- | --- |
 | `espaço` / `enter` | Mostrar a resposta | Revelar |
 | `1` `2` `3` `4` | De novo · Difícil · Bom · Fácil | Revelar |
-| `enter` | Conferir a resposta / avançar | Digitar |
+| (nenhuma) | A conferência e o avanço são automáticos | Digitar |
+| `enter` | Confirmar antes de completar a palavra | Digitar |
 
 ## Notas
 

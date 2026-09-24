@@ -167,6 +167,19 @@ export function alvoDeCobertura(script: "hiragana" | "katakana"): string[] {
 }
 
 /**
+ * O trecho de kana no começo do texto, parando no primeiro caractere que não
+ * for kana.
+ *
+ * Serve para ler uma digitação em andamento: "sakur" vira さく + "r", e o que
+ * interessa para comparar é o さく — o "r" ainda vai virar sílaba.
+ */
+export function prefixoKana(texto: string): string {
+  let fim = 0;
+  while (fim < texto.length && ehKana(texto[fim])) fim += 1;
+  return texto.slice(0, fim);
+}
+
+/**
  * Os caracteres que uma palavra "ensina".
  *
  * Ignora os kana pequenos (ゃゅょっ) porque eles não são sons independentes:

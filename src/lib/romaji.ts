@@ -4,6 +4,7 @@ import {
   colapsarAmbiguos,
   expandirProlongador,
   paraHiragana,
+  prefixoKana,
   soTemKana,
 } from "./kana";
 
@@ -243,6 +244,38 @@ const SO_NA_VOLTA: Record<string, string> = {
   づ: "zu",
   ぢ: "ji",
 };
+
+/**
+ * Situação de uma resposta ainda sendo digitada.
+ *
+ * `incompleto` é o estado normal enquanto a pessoa escreve: o que está lá
+ * ainda pode virar a resposta certa.
+ */
+export type EstadoDigitacao = "incompleto" | "acertou" | "errou";
+
+/**
+ * Avalia a digitação a cada tecla, para conferir sem esperar confirmação.
+ *
+ * A regra é de prefixo, e não de tamanho: enquanto o kana já formado puder
+ * crescer até alguma das leituras aceitas, a resposta segue em aberto. Assim
+ * "sakuna" é reprovado na hora — さくな não leva a さくら — enquanto "sakur"
+ * continua em aberto. Esperar a pessoa parar de digitar puniria quem pensa
+ * antes de terminar a palavra.
+ */
+export function avaliarDigitacao(digitado: string, reading: string): EstadoDigitacao {
+  const alternativas = leiturasAceitas(reading).map(chaveComparacao);
+
+  // `kanaParcial` deixa cru o que ainda não fecha sílaba ("sakur" → さくr);
+  // só a parte já convertida pode ser comparada.
+  const escrito = chaveComparacao(prefixoKana(kanaParcial(digitado)));
+
+  if (escrito.length === 0) return "incompleto";
+  if (alternativas.includes(escrito)) return "acertou";
+  if (alternativas.some((alternativa) => alternativa.startsWith(escrito))) {
+    return "incompleto";
+  }
+  return "errou";
+}
 
 /** Mapa inverso, montado uma vez, com os dígrafos antes das sílabas simples. */
 const KANA_PARA_ROMAJI: [string, string][] = [

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  avaliarDigitacao,
   chaveComparacao,
   kanaParaRomaji,
   kanaParcial,
@@ -183,6 +184,49 @@ describe("verificarResposta", () => {
 
   it("ignora espaços e maiúsculas", () => {
     expect(verificarResposta("  SaKuRa ", "さくら").acertou).toBe(true);
+  });
+});
+
+describe("avaliarDigitacao — conferência a cada tecla", () => {
+  it("fica em aberto enquanto a resposta ainda pode se formar", () => {
+    for (const parcial of ["s", "sa", "sak", "saku", "sakur"]) {
+      expect(avaliarDigitacao(parcial, "さくら"), parcial).toBe("incompleto");
+    }
+  });
+
+  it("reprova assim que o caminho para a resposta se fecha", () => {
+    // さくな nunca vira さくら: não adianta esperar o resto.
+    expect(avaliarDigitacao("sakuna", "さくら")).toBe("errou");
+    expect(avaliarDigitacao("neko", "さくら")).toBe("errou");
+  });
+
+  it("aprova no instante em que a palavra fecha", () => {
+    expect(avaliarDigitacao("sakura", "さくら")).toBe("acertou");
+  });
+
+  it("campo vazio fica em aberto, não é erro", () => {
+    expect(avaliarDigitacao("", "さくら")).toBe("incompleto");
+  });
+
+  it("considera todas as leituras alternativas", () => {
+    // 日 aceita にち e ひ: digitar "hi" fecha, "ni" ainda está a caminho.
+    expect(avaliarDigitacao("hi", "にち・ひ")).toBe("acertou");
+    expect(avaliarDigitacao("ni", "にち・ひ")).toBe("incompleto");
+    expect(avaliarDigitacao("nichi", "にち・ひ")).toBe("acertou");
+    expect(avaliarDigitacao("tsu", "にち・ひ")).toBe("errou");
+  });
+
+  it("exige o alongamento do katakana", () => {
+    expect(avaliarDigitacao("ko", "コーヒー")).toBe("incompleto");
+    expect(avaliarDigitacao("koohii", "コーヒー")).toBe("acertou");
+    // こひ não é começo de こおひい: reprova sem esperar.
+    expect(avaliarDigitacao("kohi", "コーヒー")).toBe("errou");
+  });
+
+  it("não reprova no meio de uma sílaba", () => {
+    // "gakk" ainda é caminho para がっこう, mesmo com o k solto no fim.
+    expect(avaliarDigitacao("gakk", "がっこう")).toBe("incompleto");
+    expect(avaliarDigitacao("gakkou", "がっこう")).toBe("acertou");
   });
 });
 

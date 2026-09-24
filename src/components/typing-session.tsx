@@ -1,9 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DetalhesRevisao } from "@/app/actions";
 import { SEPARADOR_LEITURAS } from "@/lib/kana";
-import { kanaParaRomaji, kanaParcial, verificarResposta } from "@/lib/romaji";
+import {
+  avaliarDigitacao,
+  kanaParaRomaji,
+  kanaParcial,
+  verificarResposta,
+} from "@/lib/romaji";
 import type { CardEstudo } from "@/lib/server/study";
 import type { Rating } from "@/lib/srs";
 import { useSessaoEstudo } from "@/lib/use-sessao-estudo";
@@ -12,16 +17,17 @@ import { SessionDone } from "./session-done";
 /**
  * Modo digitação: a palavra aparece em japonês e a pessoa escreve o romaji.
  *
- * Diferente do flashcard, aqui a nota é objetiva — ou a leitura está certa, ou
- * não está. Acertar de primeira vale "Bom"; errar ou pedir a resposta antes
- * vale "De novo". Não há botões de auto-avaliação: o teclado já respondeu.
- *
- * Mesmo depois de errar é preciso digitar a palavra certa para seguir. Esse
- * passo não gera outra revisão — ele existe para fixar a escrita, que é o
- * ponto do modo.
+ * A sessão inteira se faz com o teclado. A resposta é conferida a cada tecla —
+ * assim que o que foi escrito fecha a palavra, ou deixa de poder fechá-la, o
+ * resultado aparece e a próxima palavra entra sozinha. Não há botão de
+ * confirmar nem de avaliar: acertar de primeira vale "Bom", errar ou pedir a
+ * resposta vale "De novo".
  */
 
-type Fase = "digitando" | "corrigindo" | "conferido";
+/** Quanto tempo o resultado fica na tela antes da próxima palavra. */
+const MS_RESULTADO = 400;
+
+type Resultado = "acertou" | "errou" | "revelado";
 
 export function TypingSession({
   filaInicial,
@@ -59,7 +65,8 @@ export function TypingSession({
       </div>
 
       {/* A chave zera o estado da rodada sem precisar sincronizar nada por
-          efeito: avançar desmonta este formulário e monta outro, limpo. */}
+          efeito: avançar desmonta este formulário e monta outro, limpo — com
+          o foco já no campo. */}
       <Rodada
         key={rodada}
         card={card}
@@ -94,59 +101,59 @@ function Rodada({
   aoAvancar: () => void;
 }) {
   const [texto, setTexto] = useState("");
-  const [fase, setFase] = useState<Fase>("digitando");
-  const [acertou, setAcertou] = useState(false);
-  /** Pediu para ver a resposta antes de tentar: a nota já está decidida. */
-  const [pediuAjuda, setPediuAjuda] = useState(false);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
 
   const campo = useRef<HTMLInputElement>(null);
+  const relogio = useRef<number | null>(null);
+
+  // O avanço automático precisa ser cancelado se a rodada sair de cena antes
+  // da hora — senão o temporizador dispara sobre um componente desmontado.
+  useEffect(() => {
+    return () => {
+      if (relogio.current !== null) window.clearTimeout(relogio.current);
+    };
+  }, []);
 
   // A primeira alternativa é a que aparece como resposta esperada; qualquer
   // uma delas é aceita na conferência.
-  const romajiEsperado = kanaParaRomaji(card.reading.split(SEPARADOR_LEITURAS)[0]);
+  const leituraPrincipal = card.reading.split(SEPARADOR_LEITURAS)[0];
+  const romajiEsperado = kanaParaRomaji(leituraPrincipal);
 
-  async function conferir() {
-    if (salvando) return;
+  async function registrar(acertou: boolean, digitado: string) {
+    setResultado(acertou ? "acertou" : "errou");
 
-    const veredito = verificarResposta(texto, card.reading);
-
-    // Já respondeu por este card: daqui em diante é treino de escrita, sem
-    // nova revisão. Acertando, libera o avanço.
-    if (fase === "corrigindo") {
-      if (veredito.acertou) setFase("conferido");
-      else setTexto("");
-      return;
-    }
-
-    const certo = veredito.acertou && !pediuAjuda;
-    setAcertou(certo);
-
-    const gravou = await aoResponder(certo ? "good" : "again", {
+    const gravou = await aoResponder(acertou ? "good" : "again", {
       modo: "digitacao",
       // Só guardamos o que foi digitado quando saiu errado: é esse dado que
       // depois mostra quais confusões se repetem.
-      resposta: veredito.acertou ? undefined : texto,
+      resposta: acertou ? undefined : digitado,
     });
-    if (!gravou) return;
 
-    if (certo) {
-      setFase("conferido");
-    } else {
-      // Errou: mostra a resposta e exige a digitação correta antes de seguir.
-      setFase("corrigindo");
-      setTexto("");
+    if (!gravou) {
+      setResultado(null);
+      return;
     }
+
+    relogio.current = window.setTimeout(aoAvancar, MS_RESULTADO);
+  }
+
+  function aoDigitar(valor: string) {
+    if (resultado !== null) return;
+    setTexto(valor);
+
+    // Confere a cada tecla: a palavra fechou, ou deixou de poder fechar.
+    const estado = avaliarDigitacao(valor, card.reading);
+    if (estado === "acertou") void registrar(true, valor);
+    else if (estado === "errou") void registrar(false, valor);
   }
 
   async function revelar() {
-    if (salvando) return;
+    if (resultado !== null || salvando) return;
 
-    setPediuAjuda(true);
-    setAcertou(false);
-    setFase("corrigindo");
-    setTexto("");
-
+    setResultado("revelado");
     await aoResponder("again", { modo: "digitacao" });
+    // Aqui não há avanço automático: quem pediu a resposta precisa de tempo
+    // para lê-la, e é o enter que diz quando terminou.
     campo.current?.focus();
   }
 
@@ -155,30 +162,46 @@ function Rodada({
     // deve ser lido como "enviar resposta".
     if (evento.nativeEvent.isComposing) return;
     if (evento.key !== "Enter") return;
-
     evento.preventDefault();
-    if (fase === "conferido") aoAvancar();
-    else void conferir();
+
+    if (resultado === "revelado") {
+      aoAvancar();
+      return;
+    }
+    if (resultado !== null) return;
+
+    // Enter com a palavra ainda pela metade: vale como desistir da tentativa,
+    // para quem prefere confirmar em vez de esperar a conferência automática.
+    if (texto.trim().length > 0) {
+      void registrar(verificarResposta(texto, card.reading).acertou, texto);
+    }
   }
+
+  const acertou = resultado === "acertou";
+  const mostrandoResposta = resultado !== null;
 
   return (
     <>
       <article className="rounded-xl border border-border bg-surface">
         <div className="flex min-h-40 flex-col items-center justify-center gap-2 p-8 text-center">
           <p className="jp text-6xl font-medium leading-tight">{card.front}</p>
-          {fase !== "digitando" && (
+          {mostrandoResposta && (
             <p className="mt-2 text-base font-medium">{card.meaning}</p>
           )}
         </div>
 
-        {fase !== "digitando" && (
+        {mostrandoResposta && (
           <div
             className={`border-t p-4 text-center ${
-              acertou ? "border-border" : "border-accent/30 bg-accent-soft"
+              acertou ? "border-success/40 bg-success/10" : "border-accent/30 bg-accent-soft"
             }`}
           >
-            <p className="text-xs uppercase tracking-wide text-muted">
-              {acertou ? "Você acertou" : "A resposta era"}
+            <p
+              className={`text-xs font-semibold uppercase tracking-wide ${
+                acertou ? "text-success" : "text-accent"
+              }`}
+            >
+              {acertou ? "Certo" : "A resposta era"}
             </p>
             <p className="jp mt-1 text-2xl">{card.reading}</p>
             <p className="mt-0.5 text-sm text-muted">{romajiEsperado}</p>
@@ -203,10 +226,12 @@ function Rodada({
           id="resposta"
           ref={campo}
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => aoDigitar(e.target.value)}
           onKeyDown={aoTeclar}
-          disabled={fase === "conferido" || salvando}
-          placeholder={fase === "corrigindo" ? "digite para fixar" : "digite em romaji"}
+          // `readOnly` em vez de `disabled`: o campo para de aceitar texto mas
+          // mantém o foco, e a próxima palavra já entra pronta para digitar.
+          readOnly={mostrandoResposta}
+          placeholder="digite em romaji"
           // O teclado do celular sabota romaji: maiúscula automática no início
           // e autocorreção trocando "ka" por outra palavra.
           autoCapitalize="off"
@@ -217,8 +242,8 @@ function Rodada({
           // O foco precisa voltar a cada palavra, senão o ritmo da sessão
           // quebra: sem isto seria preciso clicar no campo a cada card.
           autoFocus
-          className={`w-full rounded-lg border bg-surface px-4 py-3 text-center text-lg outline-none transition-colors disabled:opacity-60 ${
-            fase === "digitando"
+          className={`w-full rounded-lg border bg-surface px-4 py-3 text-center text-lg outline-none transition-colors ${
+            resultado === null
               ? "border-border focus:border-accent"
               : acertou
                 ? "border-success"
@@ -229,15 +254,15 @@ function Rodada({
         {/* Eco do kana enquanto digita: é aqui que se aprende que "sha" é uma
             sílaba só, e não três letras. */}
         <p className="jp mt-2 h-6 text-center text-lg text-muted">
-          {fase === "conferido" ? "" : kanaParcial(texto)}
+          {mostrandoResposta ? "" : kanaParcial(texto)}
         </p>
       </div>
 
-      {fase === "conferido" ? (
+      {resultado === "revelado" ? (
         <button
           type="button"
           onClick={aoAvancar}
-          className="w-full rounded-lg bg-accent px-4 py-3.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+          className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
         >
           Próxima
           <span className="ml-2 hidden text-xs font-normal opacity-70 sm:inline">
@@ -245,24 +270,14 @@ function Rodada({
           </span>
         </button>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => void revelar()}
-            disabled={fase === "corrigindo" || salvando}
-            className="rounded-lg border border-border bg-surface-muted px-4 py-3 text-sm font-semibold transition-colors hover:border-accent disabled:opacity-40"
-          >
-            Exibir resposta
-          </button>
-          <button
-            type="button"
-            onClick={() => void conferir()}
-            disabled={texto.trim().length === 0 || salvando}
-            className="rounded-lg bg-accent px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-          >
-            {fase === "corrigindo" ? "Confirmar" : "Conferir"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => void revelar()}
+          disabled={mostrandoResposta || salvando}
+          className="w-full rounded-lg border border-border bg-surface-muted px-4 py-3 text-sm font-semibold transition-colors hover:border-accent disabled:opacity-40"
+        >
+          Não sei — exibir resposta
+        </button>
       )}
     </>
   );
