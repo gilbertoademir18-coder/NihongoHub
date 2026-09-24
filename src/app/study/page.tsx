@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { StudySession } from "@/components/study-session";
-import { buscarDeck, buscarFila } from "@/lib/server/study";
+import { TypingSession } from "@/components/typing-session";
+import {
+  type FiltroScript,
+  buscarDeck,
+  buscarFila,
+} from "@/lib/server/study";
 
 export const metadata = {
   title: "Revisar — NihongoHub",
@@ -9,9 +14,20 @@ export const metadata = {
 // A fila é montada no instante do acesso: nada aqui pode ser prerenderizado.
 export const dynamic = "force-dynamic";
 
+const SCRIPTS: FiltroScript[] = ["hiragana", "katakana", "ambos"];
+
+function lerScript(valor: string | string[] | undefined): FiltroScript {
+  return typeof valor === "string" && (SCRIPTS as string[]).includes(valor)
+    ? (valor as FiltroScript)
+    : "ambos";
+}
+
 export default async function StudyPage({ searchParams }: PageProps<"/study">) {
-  const { deck: deckId } = await searchParams;
-  const idDoDeck = typeof deckId === "string" ? deckId : null;
+  const params = await searchParams;
+
+  const idDoDeck = typeof params.deck === "string" ? params.deck : null;
+  const digitando = params.modo === "digitacao";
+  const script = lerScript(params.script);
 
   const deck = idDoDeck ? await buscarDeck(idDoDeck) : null;
 
@@ -32,12 +48,13 @@ export default async function StudyPage({ searchParams }: PageProps<"/study">) {
     );
   }
 
-  const fila = await buscarFila(idDoDeck);
+  const fila = await buscarFila(idDoDeck, { script });
 
-  return (
-    <StudySession
-      filaInicial={fila}
-      deckName={deck?.name}
-    />
+  // O modo é da sessão, não do conteúdo: o mesmo deck pode ser estudado
+  // revelando a resposta ou digitando.
+  return digitando ? (
+    <TypingSession filaInicial={fila} deckName={deck?.name} />
+  ) : (
+    <StudySession filaInicial={fila} deckName={deck?.name} />
   );
 }

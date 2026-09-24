@@ -119,12 +119,47 @@ O japonês usa a fonte **do sistema** (Hiragino, Yu Gothic, Noto CJK conforme a
 plataforma). Empacotar a Noto Sans JP custava 5,5 MB em 131 fatias baixadas sob
 demanda. O latino usa Inter, que tem subset pequeno.
 
+## Modos de estudo
+
+O modo é da sessão, não do conteúdo: qualquer deck pode ser estudado dos dois
+jeitos (`/study?deck=<id>&modo=digitacao`).
+
+**Revelar** — mostra o japonês, você revela a resposta e se auto-avalia em
+quatro botões.
+
+**Digitar** — mostra a palavra e você escreve o romaji. A nota é objetiva:
+acertar de primeira vale "Bom", errar ou pedir a resposta vale "De novo", sem
+botões. Errando, é preciso digitar a palavra certa para seguir — esse passo
+não gera outra revisão, ele existe para fixar a escrita.
+
+O campo mostra o kana se formando enquanto você digita, que é onde se aprende
+que `sha` é uma sílaba só e não três letras.
+
+Só Hepburn é aceito (`shi`, `chi`, `tsu`, `fu`) — ver `src/lib/romaji.ts`.
+
+### Rotação de lote
+
+Um deck de 159 palavras não despeja 159. Cada deck tem um `loteAtivo` (padrão
+10): palavras novas só entram quando outra amadurece (intervalo ≥ 7 dias, em
+`src/lib/lote.ts`). O atraso vem sempre antes da novidade — voltar depois de
+uma semana parado significa "recupere o que ficou", e não "aqui estão dez
+palavras novas por cima".
+
+### Vocabulário em kana
+
+159 palavras reais cobrindo os dois silabários, em `src/lib/palavras-kana.ts`,
+com um teste que falha se algum kana ficar sem palavra. As exclusões são
+declaradas com motivo em `src/lib/kana.ts`: `を` só existe como partícula
+(entra na frase みずをのむ), `ヲ ヂ ヅ` não ocorrem em empréstimos modernos, e
+`ゐ ゑ ヰ ヱ` são obsoletos.
+
 ## Atalhos de teclado
 
-| Tecla | Ação |
-| --- | --- |
-| `espaço` / `enter` | Mostrar a resposta |
-| `1` `2` `3` `4` | De novo · Difícil · Bom · Fácil |
+| Tecla | Ação | Modo |
+| --- | --- | --- |
+| `espaço` / `enter` | Mostrar a resposta | Revelar |
+| `1` `2` `3` `4` | De novo · Difícil · Bom · Fácil | Revelar |
+| `enter` | Conferir a resposta / avançar | Digitar |
 
 ## Notas
 

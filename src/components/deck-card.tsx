@@ -2,26 +2,25 @@ import Link from "next/link";
 import type { DeckComStats } from "@/lib/server/study";
 
 /**
- * Um deck na lista da home, com o resumo do que está esperando nele.
+ * Um deck na lista da home, com o resumo e as formas de estudá-lo.
  *
  * Recebe as estatísticas já prontas em vez de buscá-las: quem monta a lista
  * traz as contagens de todos os decks numa consulta agregada só.
  */
 export function DeckCard({ deck }: { deck: DeckComStats }) {
+  const temKana = deck.temHiragana || deck.temKatakana;
+
   return (
-    <Link
-      href={`/study?deck=${deck.id}`}
-      className="block rounded-xl border border-border bg-surface p-4 transition-colors hover:border-accent/40"
-    >
+    <article className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="jp truncate font-semibold">{deck.name}</h3>
           <p className="mt-0.5 text-sm text-muted">{deck.description}</p>
         </div>
 
-        {deck.due > 0 && (
+        {deck.paraEstudar > 0 && (
           <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent tabular-nums">
-            {deck.due} {deck.due === 1 ? "vencido" : "vencidos"}
+            {deck.paraEstudar} na fila
           </span>
         )}
       </div>
@@ -40,6 +39,44 @@ export function DeckCard({ deck }: { deck: DeckComStats }) {
           <dd className="font-medium text-foreground">{deck.learning}</dd>
         </div>
       </dl>
-    </Link>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href={`/study?deck=${deck.id}`}
+          className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:border-accent"
+        >
+          Revelar
+        </Link>
+        <Link
+          href={`/study?deck=${deck.id}&modo=digitacao`}
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+        >
+          Digitar
+        </Link>
+      </div>
+
+      {/* O filtro de silabário só faz sentido onde há palavras em kana. */}
+      {temKana && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <span className="text-xs text-muted">Digitar só:</span>
+          {deck.temHiragana && (
+            <Link
+              href={`/study?deck=${deck.id}&modo=digitacao&script=hiragana`}
+              className="jp rounded-full border border-border px-2.5 py-1 text-xs transition-colors hover:border-accent"
+            >
+              ひらがな
+            </Link>
+          )}
+          {deck.temKatakana && (
+            <Link
+              href={`/study?deck=${deck.id}&modo=digitacao&script=katakana`}
+              className="jp rounded-full border border-border px-2.5 py-1 text-xs transition-colors hover:border-accent"
+            >
+              カタカナ
+            </Link>
+          )}
+        </div>
+      )}
+    </article>
   );
 }

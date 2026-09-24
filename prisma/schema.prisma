@@ -21,12 +21,31 @@ enum Rating {
   @@map("rating")
 }
 
+/// O silabário de uma palavra. `null` nos cards que usam kanji.
+enum Script {
+  hiragana
+  katakana
+
+  @@map("script")
+}
+
+/// Como o card foi apresentado na revisão.
+enum ModoEstudo {
+  /// Revela a resposta e a pessoa se auto-avalia.
+  flashcard
+  /// A pessoa digita o romaji e o app confere.
+  digitacao
+
+  @@map("modo_estudo")
+}
+
 model Deck {
   id          String   @id @default(uuid())
   name        String
   description String   @default("")
-  /// Quantos cards novos podem ser introduzidos por dia.
-  newPerDay   Int      @default(10) @map("new_per_day")
+  /// Quantas palavras ficam em aprendizado ao mesmo tempo. Uma nova só entra
+  /// quando outra amadurece — é o que impede o deck de despejar tudo de uma vez.
+  loteAtivo   Int      @default(10) @map("lote_ativo")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   cards   Card[]
@@ -48,6 +67,8 @@ model Card {
   example        String?
   exampleMeaning String?  @map("example_meaning")
   tags           String[] @default([])
+  /// Silabário da palavra, para filtrar a sessão. `null` nos cards com kanji.
+  script         Script?
 
   // Estado do SRS, achatado em colunas em vez de um JSON: só assim o
   // vencimento entra em índice, e a fila do dia vira uma varredura de range.
@@ -61,6 +82,14 @@ model Card {
   dueAt        DateTime @map("due_at") @db.Timestamptz(3)
   lapses       Int      @default(0)
 
+  /// Quando a palavra foi estudada pela primeira vez. `null` = nunca vista.
+  ///
+  /// Nenhuma combinação dos campos de SRS dá esse sinal: um card novo e um
+  /// card recém-errado têm exatamente o mesmo estado (`repetitions: 0`,
+  /// `learningStep: 0`). Sem esta coluna não há como montar um lote fixo nem
+  /// contar corretamente quantas palavras ainda são novidade.
+  introducedAt DateTime? @map("introduced_at") @db.Timestamptz(3)
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   deck    Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
@@ -69,6 +98,10 @@ model Card {
   // A fila de um deck e a fila geral são as duas únicas leituras quentes.
   @@index([deckId, dueAt])
   @@index([dueAt])
+  // Montagem do lote: separar o que já foi introduzido do que ainda é novo,
+  // opcionalmente filtrando por silabário.
+  @@index([deckId, introducedAt])
+  @@index([deckId, script, introducedAt])
   @@map("cards")
 }
 
@@ -77,6 +110,13 @@ model Review {
   cardId String @map("card_id")
   deckId String @map("deck_id")
   rating Rating
+  /// Em que modo o card foi respondido. Um "again" de botão e um "again" por
+  /// erro de digitação são eventos diferentes; sem esta coluna eles nascem
+  /// indistinguíveis e o passado não é recuperável.
+  modo   ModoEstudo @default(flashcard)
+  /// O que foi digitado, quando a resposta saiu errada no modo digitação.
+  /// É o que permite descobrir depois quais erros se repetem.
+  resposta String?
 
   reviewedAt DateTime @default(now()) @map("reviewed_at") @db.Timestamptz(3)
   /// Intervalo antes e depois: permite reconstruir a curva de aprendizado.

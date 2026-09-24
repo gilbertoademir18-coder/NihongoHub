@@ -1,15 +1,15 @@
 import Link from "next/link";
 import { DeckCard } from "@/components/deck-card";
-import { contarVencidos, listarDecksComStats } from "@/lib/server/study";
+import { contarParaEstudar, listarDecksComStats } from "@/lib/server/study";
 
 // A fila muda a cada revisão: prerenderizar esta página serviria números
 // velhos, e no build nem haveria banco para consultar.
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [decks, vencidos] = await Promise.all([
+  const [decks, paraEstudar] = await Promise.all([
     listarDecksComStats(),
-    contarVencidos(),
+    contarParaEstudar(),
   ]);
 
   return (
@@ -17,13 +17,13 @@ export default async function HomePage() {
       <section className="rounded-xl border border-border bg-surface p-5">
         <p className="text-sm text-muted">Sua fila de hoje</p>
         <p className="mt-1 flex items-baseline gap-2">
-          <span className="text-4xl font-bold tabular-nums">{vencidos}</span>
+          <span className="text-4xl font-bold tabular-nums">{paraEstudar}</span>
           <span className="text-sm text-muted">
-            {vencidos === 1 ? "card para revisar" : "cards para revisar"}
+            {paraEstudar === 1 ? "card para revisar" : "cards para revisar"}
           </span>
         </p>
 
-        {vencidos > 0 ? (
+        {paraEstudar > 0 ? (
           <Link
             href="/study"
             className="mt-4 inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"

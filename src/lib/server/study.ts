@@ -1,7 +1,17 @@
 import "server-only";
 
+import {
+  HORIZONTE_SESSAO_MS,
+  LIMIAR_MADURO_DIAS,
+  LOTE_PADRAO,
+  ordenarFila,
+  vagasParaNovos,
+} from "../lote";
 import { prisma } from "../prisma";
 import type { SrsState } from "../srs";
+
+/** Filtro de silabário da sessão. `ambos` não restringe nada. */
+export type FiltroScript = "hiragana" | "katakana" | "ambos";
 
 /**
  * Leituras do banco para as telas de estudo.
@@ -83,12 +93,21 @@ export interface DeckComStats {
   name: string;
   description: string;
   total: number;
-  /** Cards vencidos, prontos para revisar. */
-  due: number;
+  /**
+   * Quantos cards a próxima sessão traria de verdade.
+   *
+   * Não é "tudo que venceu": palavras novas entram limitadas pelo lote. Um
+   * deck de 159 palavras que anunciasse 159 prometeria o que a sessão não
+   * entrega.
+   */
+  paraEstudar: number;
   /** Cards nunca estudados. */
   fresh: number;
-  /** Cards que já foram estudados mas ainda não graduaram. */
+  /** Cards que já foram estudados mas ainda não amadureceram. */
   learning: number;
+  /** O deck tem palavras em kana, e portanto permite filtrar por silabário. */
+  temHiragana: boolean;
+  temKatakana: boolean;
 }
 
 /**
@@ -104,15 +123,30 @@ export async function listarDecksComStats(
   const [decks, linhas] = await Promise.all([
     prisma.deck.findMany({ orderBy: { createdAt: "asc" } }),
     prisma.$queryRaw<
-      { deck_id: string; total: bigint; due: bigint; fresh: bigint; learning: bigint }[]
+      {
+        deck_id: string;
+        total: bigint;
+        due: bigint;
+        fresh: bigint;
+        learning: bigint;
+        hiragana: bigint;
+        katakana: bigint;
+      }[]
     >`
       SELECT
         deck_id,
         count(*)                                                       AS total,
-        count(*) FILTER (WHERE due_at <= ${agora})                     AS due,
-        count(*) FILTER (WHERE repetitions = 0)                        AS fresh,
-        count(*) FILTER (WHERE learning_step IS NOT NULL
-                           AND repetitions > 0)                        AS learning
+        -- Só o que já foi estudado conta como "vencido": palavra nunca vista
+        -- não está atrasada, está esperando vaga.
+        count(*) FILTER (WHERE introduced_at IS NOT NULL
+                           AND due_at <= ${agora})                     AS due,
+        -- "Nova" é a palavra nunca estudada. Contar por repetitions = 0
+        -- incluía quem tinha acabado de errar, porque errar zera o contador.
+        count(*) FILTER (WHERE introduced_at IS NULL)                  AS fresh,
+        count(*) FILTER (WHERE introduced_at IS NOT NULL
+                           AND interval_days < ${LIMIAR_MADURO_DIAS})  AS learning,
+        count(*) FILTER (WHERE script = 'hiragana')                    AS hiragana,
+        count(*) FILTER (WHERE script = 'katakana')                    AS katakana
       FROM cards
       GROUP BY deck_id
     `,
@@ -122,23 +156,36 @@ export async function listarDecksComStats(
 
   return decks.map((deck) => {
     const stats = porDeck.get(deck.id);
+    // count() do Postgres volta como bigint, que não sobrevive à serialização
+    // para o cliente — daí a conversão explícita.
+    const vencidos = Number(stats?.due ?? 0);
+    const novos = Number(stats?.fresh ?? 0);
+    const ocupantes = Number(stats?.learning ?? 0);
+
     return {
       id: deck.id,
       name: deck.name,
       description: deck.description,
-      // count() do Postgres volta como bigint, que não sobrevive à
-      // serialização para o cliente — daí a conversão explícita.
       total: Number(stats?.total ?? 0),
-      due: Number(stats?.due ?? 0),
-      fresh: Number(stats?.fresh ?? 0),
-      learning: Number(stats?.learning ?? 0),
+      paraEstudar:
+        vencidos + Math.min(novos, vagasParaNovos(ocupantes, deck.loteAtivo)),
+      fresh: novos,
+      learning: ocupantes,
+      temHiragana: Number(stats?.hiragana ?? 0) > 0,
+      temKatakana: Number(stats?.katakana ?? 0) > 0,
     };
   });
 }
 
-/** Quantos cards estão vencidos no total, em todos os decks. */
-export async function contarVencidos(agora: Date = new Date()): Promise<number> {
-  return prisma.card.count({ where: { dueAt: { lte: agora } } });
+/**
+ * Quantos cards a próxima sessão traria, somando todos os decks.
+ *
+ * Reaproveita as estatísticas por deck em vez de recontar: é a mesma regra de
+ * lote, e duas contas diferentes acabariam divergindo.
+ */
+export async function contarParaEstudar(agora: Date = new Date()): Promise<number> {
+  const decks = await listarDecksComStats(agora);
+  return decks.reduce((soma, deck) => soma + deck.paraEstudar, 0);
 }
 
 /** Busca um deck pelo id. Devolve `null` se não existir. */
@@ -146,25 +193,94 @@ export async function buscarDeck(deckId: string) {
   return prisma.deck.findUnique({ where: { id: deckId } });
 }
 
+export interface OpcoesDaFila {
+  /** Restringe a sessão a um silabário. */
+  script?: FiltroScript;
+  agora?: Date;
+  /** Tamanho do lote; por padrão vem do deck. */
+  tamanhoDoLote?: number;
+}
+
 /**
- * A fila de revisão: cards vencidos, os mais atrasados primeiro.
+ * Monta a fila da sessão.
  *
- * Quem passou mais tempo do ponto é quem está mais perto de ser esquecido.
+ * São três grupos, nesta ordem de prioridade: o que está em aprendizado, o que
+ * venceu, e por fim palavras novas — estas últimas só até preencher o lote.
+ * É isso que impede o deck de despejar 159 palavras de uma vez e o que faz
+ * voltar depois de uma semana parado significar "recupere o atraso", e não
+ * "aqui estão dez novidades por cima dele".
  */
 export async function buscarFila(
   deckId: string | null,
-  agora: Date = new Date(),
-  limite = 100,
+  opcoes: OpcoesDaFila = {},
 ): Promise<CardEstudo[]> {
-  const linhas = await prisma.card.findMany({
-    where: {
-      dueAt: { lte: agora },
-      ...(deckId ? { deckId } : {}),
-    },
-    orderBy: { dueAt: "asc" },
-    take: limite,
-    select: SELECAO_CARD,
-  });
+  const { script = "ambos", agora = new Date() } = opcoes;
 
-  return linhas.map(paraCardEstudo);
+  const doDeck = deckId ? { deckId } : {};
+  const doScript = script === "ambos" ? {} : { script };
+  const base = { ...doDeck, ...doScript };
+
+  const tamanhoDoLote =
+    opcoes.tamanhoDoLote ??
+    (deckId
+      ? ((await prisma.deck.findUnique({ where: { id: deckId } }))?.loteAtivo ??
+        LOTE_PADRAO)
+      : LOTE_PADRAO);
+
+  const [emAprendizado, vencidos, ocupantes] = await Promise.all([
+    // Em aprendizado: inclui o que vence daqui a pouco. Filtrar só por
+    // `dueAt <= agora` esvaziaria a tela de quem recarrega a página no meio
+    // de um passo de 1 minuto.
+    prisma.card.findMany({
+      where: {
+        ...base,
+        introducedAt: { not: null },
+        learningStep: { not: null },
+        dueAt: { lte: new Date(agora.getTime() + HORIZONTE_SESSAO_MS) },
+      },
+      orderBy: { dueAt: "asc" },
+      select: SELECAO_CARD,
+    }),
+
+    // Revisões vencidas de cards já graduados.
+    prisma.card.findMany({
+      where: {
+        ...base,
+        introducedAt: { not: null },
+        learningStep: null,
+        dueAt: { lte: agora },
+      },
+      orderBy: { dueAt: "asc" },
+      take: 100,
+      select: SELECAO_CARD,
+    }),
+
+    // Quem ocupa vaga no lote: já foi introduzido e ainda não amadureceu.
+    prisma.card.count({
+      where: {
+        ...base,
+        introducedAt: { not: null },
+        intervalDays: { lt: LIMIAR_MADURO_DIAS },
+      },
+    }),
+  ]);
+
+  const vagas = vagasParaNovos(ocupantes, tamanhoDoLote);
+
+  const novos = vagas
+    ? await prisma.card.findMany({
+        where: { ...base, introducedAt: null },
+        // `createdAt` guarda a ordem pedagógica com que as palavras foram
+        // semeadas: as primeiras usam os kana mais simples.
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: vagas,
+        select: SELECAO_CARD,
+      })
+    : [];
+
+  return ordenarFila(
+    emAprendizado.map(paraCardEstudo),
+    vencidos.map(paraCardEstudo),
+    novos.map(paraCardEstudo),
+  );
 }
