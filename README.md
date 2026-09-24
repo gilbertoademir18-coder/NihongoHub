@@ -5,6 +5,12 @@ funciona offline — feito para estudar no ônibus, sem sinal.
 
 ## Começando
 
+No Windows, **dê um duplo clique em `abrir.cmd`**. Ele instala as dependências
+na primeira vez, sobe o servidor e abre o navegador sozinho quando estiver
+pronto. Para parar, feche a janela.
+
+Ou pela linha de comando:
+
 ```bash
 npm install
 npm run dev      # http://localhost:3000
@@ -15,6 +21,7 @@ direto no navegador. Não há cadastro nem servidor de dados.
 
 | Comando | O que faz |
 | --- | --- |
+| `abrir.cmd` | Sobe o servidor e abre o navegador (duplo clique, Windows) |
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm run build` | Build de produção |
 | `npm start` | Sobe o build de produção |
