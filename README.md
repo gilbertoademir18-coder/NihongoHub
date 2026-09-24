@@ -147,6 +147,23 @@ prefere decidir que terminou em vez de continuar digitando.
 
 Só Hepburn é aceito (`shi`, `chi`, `tsu`, `fu`) — ver `src/lib/romaji.ts`.
 
+### Treino livre: estudar a qualquer hora
+
+O SRS existe para **não** mostrar o que você já sabe — e é justamente isso que
+faz o app dizer "tudo em dia" quando dá vontade de praticar. O treino separa os
+dois objetivos: `/study?...&treino=1` repassa palavras já estudadas, quantas
+vezes você quiser, e **nada muda no agendamento**. Uma palavra treinada hoje
+volta na data que já tinha.
+
+A escolha prioriza o que resiste mais — mais lapsos e menor facilidade
+(`src/lib/treino.ts`) — sorteando entre as mais difíceis para o treino não
+virar sempre a mesma lista. Só entram palavras já introduzidas: treinar o que
+nunca foi visto seria furar o lote pela porta dos fundos.
+
+As revisões de treino **são gravadas**, marcadas com `treino = true`. Não valem
+para o algoritmo, mas contam para responder depois "quais palavras eu mais
+erro".
+
 ### Rotação de lote
 
 Um deck de 159 palavras não despeja 159. Cada deck tem um `loteAtivo` (padrão

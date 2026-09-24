@@ -48,11 +48,17 @@ const AVALIACOES: {
 export function StudySession({
   filaInicial,
   deckName,
+  treino = false,
+  linkTreino,
 }: {
   filaInicial: CardEstudo[];
   deckName?: string;
+  /** Treino livre: registra, mas não reagenda nada. */
+  treino?: boolean;
+  /** Para onde ir ao terminar, se houver o que treinar. */
+  linkTreino?: string;
 }) {
-  const sessao = useSessaoEstudo(filaInicial);
+  const sessao = useSessaoEstudo(filaInicial, { treino });
   const [revelado, setRevelado] = useState(false);
 
   const { atual, fila, revisados, salvando, erro, responder } = sessao;
@@ -92,7 +98,14 @@ export function StudySession({
   }, [atual, revelado, responder]);
 
   if (!atual) {
-    return <SessionDone revisados={revisados} deckName={deckName} />;
+    return (
+      <SessionDone
+        revisados={revisados}
+        deckName={deckName}
+        treino={treino}
+        linkTreino={linkTreino}
+      />
+    );
   }
 
   const previsao = previewIntervals(atual.srs);
@@ -101,7 +114,14 @@ export function StudySession({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between text-xs text-muted tabular-nums">
-        <span>{deckName ?? "Todos os decks"}</span>
+        <span className="flex items-center gap-2">
+          {deckName ?? "Todos os decks"}
+          {treino && (
+            <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-medium not-tabular-nums">
+              treino livre
+            </span>
+          )}
+        </span>
         <span>
           {fila.length} na fila · {revisados} revisados
         </span>

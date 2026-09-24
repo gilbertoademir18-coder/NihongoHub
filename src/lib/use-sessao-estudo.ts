@@ -28,7 +28,19 @@ export interface SessaoEstudo {
   responder: (rating: Rating, detalhes?: DetalhesRevisao) => Promise<boolean>;
 }
 
-export function useSessaoEstudo(filaInicial: CardEstudo[]): SessaoEstudo {
+export interface OpcoesDaSessao {
+  /**
+   * Sessão de treino livre: as revisões são registradas, mas não reagendam
+   * nada.
+   */
+  treino?: boolean;
+}
+
+export function useSessaoEstudo(
+  filaInicial: CardEstudo[],
+  opcoes: OpcoesDaSessao = {},
+): SessaoEstudo {
+  const treino = opcoes.treino === true;
   const [fila, setFila] = useState(filaInicial);
   const [revisados, setRevisados] = useState(0);
   const [salvando, setSalvando] = useState(false);
@@ -60,11 +72,22 @@ export function useSessaoEstudo(filaInicial: CardEstudo[]): SessaoEstudo {
       try {
         // O agendamento é calculado e gravado no servidor; aqui só usamos o
         // card que volta de lá para decidir se ele reaparece nesta sessão.
-        const atualizado = await revisarCard(atual.id, rating, duracao, detalhes);
+        const atualizado = await revisarCard(atual.id, rating, duracao, {
+          ...detalhes,
+          treino,
+        });
 
         setFila((anterior) => {
           const resto = anterior.slice(1);
-          if (atualizado.srs.dueAt <= Date.now() + HORIZONTE_SESSAO_MS) {
+
+          // Em treino o vencimento não muda, então ele não serve de critério —
+          // usá-lo devolveria o mesmo card para sempre. Ali o que decide é ter
+          // errado: acertou, sai do bloco; errou, volta mais adiante.
+          const voltaParaAFila = treino
+            ? rating === "again"
+            : atualizado.srs.dueAt <= Date.now() + HORIZONTE_SESSAO_MS;
+
+          if (voltaParaAFila) {
             const posicao = Math.min(DISTANCIA_REINSERCAO, resto.length);
             return [...resto.slice(0, posicao), atualizado, ...resto.slice(posicao)];
           }
@@ -84,7 +107,7 @@ export function useSessaoEstudo(filaInicial: CardEstudo[]): SessaoEstudo {
         setSalvando(false);
       }
     },
-    [atual],
+    [atual, treino],
   );
 
   return { atual, fila, revisados, salvando, erro, responder };

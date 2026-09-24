@@ -5,6 +5,8 @@ import {
   type FiltroScript,
   buscarDeck,
   buscarFila,
+  buscarTreino,
+  contarTreinaveis,
 } from "@/lib/server/study";
 
 export const metadata = {
@@ -28,6 +30,7 @@ export default async function StudyPage({ searchParams }: PageProps<"/study">) {
   const idDoDeck = typeof params.deck === "string" ? params.deck : null;
   const digitando = params.modo === "digitacao";
   const script = lerScript(params.script);
+  const treinando = params.treino === "1";
 
   const deck = idDoDeck ? await buscarDeck(idDoDeck) : null;
 
@@ -48,13 +51,57 @@ export default async function StudyPage({ searchParams }: PageProps<"/study">) {
     );
   }
 
-  const fila = await buscarFila(idDoDeck, { script });
+  const [fila, treinaveis] = await Promise.all([
+    treinando ? buscarTreino(idDoDeck, { script }) : buscarFila(idDoDeck, { script }),
+    contarTreinaveis(idDoDeck, script),
+  ]);
+
+  // O treino só é oferecido quando há o que repassar: sem nenhuma palavra
+  // introduzida, o link levaria a uma sessão vazia.
+  const linkTreino =
+    treinaveis > 0
+      ? `/study?${new URLSearchParams({
+          ...(idDoDeck ? { deck: idDoDeck } : {}),
+          ...(digitando ? { modo: "digitacao" } : {}),
+          ...(script !== "ambos" ? { script } : {}),
+          treino: "1",
+        })}`
+      : undefined;
+
+  const comum = {
+    filaInicial: fila,
+    deckName: deck?.name,
+    treino: treinando,
+    linkTreino,
+  };
+
+  /**
+   * Identidade da sessão.
+   *
+   * A sessão guarda a fila em `useState`, que só lê a prop na montagem. Ao
+   * trocar de sessão — terminar a revisão e ir para o treino — o React
+   * reaproveitaria o mesmo componente e a fila nova seria ignorada, deixando a
+   * tela em "nada para estudar". A chave resolve isso remontando.
+   *
+   * Ela é feita dos **parâmetros**, e não da fila: gravar uma resposta dispara
+   * revalidação, esta página re-renderiza com a fila já menor, e uma chave
+   * derivada do conteúdo mudaria no meio do caminho — remontando a sessão e
+   * zerando o progresso a cada card. Para pedir outro bloco de treino na mesma
+   * URL existe o `bloco`, que o botão "Treinar mais" troca.
+   */
+  const chaveDaSessao = [
+    idDoDeck,
+    script,
+    digitando ? "digitacao" : "flashcard",
+    treinando ? "treino" : "revisao",
+    typeof params.bloco === "string" ? params.bloco : "",
+  ].join("|");
 
   // O modo é da sessão, não do conteúdo: o mesmo deck pode ser estudado
   // revelando a resposta ou digitando.
   return digitando ? (
-    <TypingSession filaInicial={fila} deckName={deck?.name} />
+    <TypingSession key={chaveDaSessao} {...comum} />
   ) : (
-    <StudySession filaInicial={fila} deckName={deck?.name} />
+    <StudySession key={chaveDaSessao} {...comum} />
   );
 }

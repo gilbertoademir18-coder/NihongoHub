@@ -9,6 +9,8 @@ import type { DeckComStats } from "@/lib/server/study";
  */
 export function DeckCard({ deck }: { deck: DeckComStats }) {
   const temKana = deck.temHiragana || deck.temKatakana;
+  // Só há o que treinar depois de estudar pela primeira vez.
+  const jaEstudou = deck.total > deck.fresh;
 
   return (
     <article className="rounded-xl border border-border bg-surface p-4">
@@ -53,6 +55,17 @@ export function DeckCard({ deck }: { deck: DeckComStats }) {
         >
           Digitar
         </Link>
+
+        {/* Treino livre: praticar a qualquer hora, sem esperar vencer nada e
+            sem mexer nas datas. */}
+        {jaEstudou && (
+          <Link
+            href={`/study?deck=${deck.id}&modo=digitacao&treino=1`}
+            className="rounded-lg border border-dashed border-border px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:border-accent hover:text-foreground"
+          >
+            Treinar
+          </Link>
+        )}
       </div>
 
       {/* O filtro de silabário só faz sentido onde há palavras em kana. */}

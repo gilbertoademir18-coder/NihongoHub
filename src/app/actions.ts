@@ -18,6 +18,13 @@ export interface DetalhesRevisao {
   modo?: ModoEstudo;
   /** O que foi digitado, quando errou. Serve para ver quais erros se repetem. */
   resposta?: string;
+  /**
+   * Prática fora da hora marcada.
+   *
+   * A revisão é registrada, mas o card **não** é reagendado: treinar hoje não
+   * pode encurtar o intervalo de uma palavra que já estava bem aprendida.
+   */
+  treino?: boolean;
 }
 
 /**
@@ -47,6 +54,7 @@ export async function revisarCard(
     ? Math.max(0, Math.round(durationMs))
     : 0;
   const resposta = detalhes.resposta?.slice(0, MAX_RESPOSTA) || null;
+  const treino = detalhes.treino === true;
 
   const agora = new Date();
 
@@ -63,22 +71,29 @@ export async function revisarCard(
       lapses: card.lapses,
     };
 
-    const proximo = schedule(anterior, rating, { now: agora.getTime() });
+    // Em treino o card não é reagendado: praticar fora de hora não pode
+    // encurtar o intervalo de uma palavra que já estava bem aprendida. O
+    // estado permanece exatamente como estava.
+    const proximo = treino
+      ? anterior
+      : schedule(anterior, rating, { now: agora.getTime() });
 
-    const atualizado = await tx.card.update({
-      where: { id: cardId },
-      data: {
-        ease: proximo.ease,
-        intervalDays: proximo.intervalDays,
-        repetitions: proximo.repetitions,
-        learningStep: proximo.learningStep,
-        dueAt: new Date(proximo.dueAt),
-        lapses: proximo.lapses,
-        // Marca a estreia da palavra. É o que tira a vaga dela do lote de
-        // novas — e só vale a primeira vez.
-        introducedAt: card.introducedAt ?? agora,
-      },
-    });
+    const atualizado = treino
+      ? card
+      : await tx.card.update({
+          where: { id: cardId },
+          data: {
+            ease: proximo.ease,
+            intervalDays: proximo.intervalDays,
+            repetitions: proximo.repetitions,
+            learningStep: proximo.learningStep,
+            dueAt: new Date(proximo.dueAt),
+            lapses: proximo.lapses,
+            // Marca a estreia da palavra. É o que tira a vaga dela do lote de
+            // novas — e só vale a primeira vez.
+            introducedAt: card.introducedAt ?? agora,
+          },
+        });
 
     // A revisão e o novo agendamento gravam na mesma transação: se uma falhar,
     // as duas voltam atrás e o histórico nunca discorda do estado do card.
@@ -89,6 +104,7 @@ export async function revisarCard(
         rating,
         modo,
         resposta,
+        treino,
         reviewedAt: agora,
         intervalBefore: anterior.intervalDays,
         intervalAfter: proximo.intervalDays,

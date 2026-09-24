@@ -117,6 +117,10 @@ model Review {
   /// O que foi digitado, quando a resposta saiu errada no modo digitação.
   /// É o que permite descobrir depois quais erros se repetem.
   resposta String?
+  /// Revisão de treino livre: conta para as estatísticas, mas não mexeu no
+  /// agendamento do card. Sem esta marca, o histórico misturaria prática
+  /// avulsa com revisão na hora certa e as duas deixariam de ser legíveis.
+  treino   Boolean @default(false)
 
   reviewedAt DateTime @default(now()) @map("reviewed_at") @db.Timestamptz(3)
   /// Intervalo antes e depois: permite reconstruir a curva de aprendizado.

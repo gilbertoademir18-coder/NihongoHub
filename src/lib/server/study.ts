@@ -9,6 +9,7 @@ import {
 } from "../lote";
 import { prisma } from "../prisma";
 import type { SrsState } from "../srs";
+import { TAMANHO_DO_BLOCO, montarBloco } from "../treino";
 
 /** Filtro de silabário da sessão. `ambos` não restringe nada. */
 export type FiltroScript = "hiragana" | "katakana" | "ambos";
@@ -191,6 +192,59 @@ export async function contarParaEstudar(agora: Date = new Date()): Promise<numbe
 /** Busca um deck pelo id. Devolve `null` se não existir. */
 export async function buscarDeck(deckId: string) {
   return prisma.deck.findUnique({ where: { id: deckId } });
+}
+
+/**
+ * Monta um bloco de treino livre.
+ *
+ * Só entram palavras já introduzidas — treinar o que nunca foi visto seria
+ * introduzir conteúdo pela porta dos fundos, furando o lote. A escolha
+ * prioriza o que resiste mais (mais lapsos, menor facilidade), sorteando entre
+ * as mais difíceis para o treino não virar sempre a mesma lista.
+ *
+ * Nada aqui altera agendamento: quem grava as revisões de treino é a Server
+ * Action, e ela não reagenda.
+ */
+export async function buscarTreino(
+  deckId: string | null,
+  opcoes: { script?: FiltroScript; tamanho?: number } = {},
+): Promise<CardEstudo[]> {
+  const { script = "ambos", tamanho = TAMANHO_DO_BLOCO } = opcoes;
+
+  const candidatos = await prisma.card.findMany({
+    where: {
+      ...(deckId ? { deckId } : {}),
+      ...(script === "ambos" ? {} : { script }),
+      introducedAt: { not: null },
+    },
+    // Ordenar já no banco evita trazer o deck inteiro só para escolher 20.
+    orderBy: [{ lapses: "desc" }, { ease: "asc" }],
+    take: tamanho * 5,
+    select: SELECAO_CARD,
+  });
+
+  return montarBloco(
+    candidatos.map(paraCardEstudo).map((card) => ({
+      ...card,
+      lapses: card.srs.lapses,
+      ease: card.srs.ease,
+    })),
+    tamanho,
+  );
+}
+
+/** Quantas palavras já foram introduzidas e portanto podem ser treinadas. */
+export async function contarTreinaveis(
+  deckId: string | null,
+  script: FiltroScript = "ambos",
+): Promise<number> {
+  return prisma.card.count({
+    where: {
+      ...(deckId ? { deckId } : {}),
+      ...(script === "ambos" ? {} : { script }),
+      introducedAt: { not: null },
+    },
+  });
 }
 
 export interface OpcoesDaFila {
