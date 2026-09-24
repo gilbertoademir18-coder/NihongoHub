@@ -15,8 +15,19 @@ Ou pela linha de comando:
 npm install
 npm run db:migrate   # cria as tabelas
 npm run db:seed      # carrega os decks de exemplo
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:3100
 ```
+
+### Por que a porta 3100
+
+A 3000 é o padrão do Next e a mais disputada em máquina de desenvolvimento —
+aqui ela já pertence a outro projeto. O `abrir.cmd` não se contenta em ver a
+porta responder: ele confere se **quem respondeu é o NihongoHub**. Sem isso,
+outro app atendendo ali faria o script anunciar "já está rodando" e abrir o
+navegador no lugar errado.
+
+Para mudar a porta, os dois lugares são `package.json` (scripts `dev` e
+`start`) e o `abrir.cmd`.
 
 | Comando | O que faz |
 | --- | --- |

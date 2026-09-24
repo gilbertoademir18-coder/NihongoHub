@@ -3,7 +3,9 @@ chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
-set "PORTA=3000"
+rem A porta 3000 e a mais disputada em maquina de desenvolvimento; aqui ela ja
+rem pertence a outro projeto. A 3100 evita o encontro.
+set "PORTA=3100"
 set "URL_APP=http://localhost:%PORTA%"
 
 title NihongoHub
@@ -20,16 +22,32 @@ if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" set "NAVEGA
 if not defined NAVEGADOR if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set "NAVEGADOR=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
 if not defined NAVEGADOR echo   [AVISO] Microsoft Edge nao encontrado. Usando o navegador padrao.
 
-rem Se a porta ja responde, o servidor esta de pe: so abre o navegador.
-powershell -NoProfile -Command "$c=New-Object Net.Sockets.TcpClient; try{$c.Connect('localhost',%PORTA%);$c.Close();exit 0}catch{exit 1}" >nul 2>&1
-if %errorlevel% equ 0 (
-    echo   O servidor ja esta rodando. Abrindo no Edge...
+rem Quem esta na porta? Nao basta ela responder: outro projeto atendendo ali
+rem faria o script abrir o navegador no app errado, e a mensagem "ja esta
+rem rodando" seria mentira.
+rem   0 = o NihongoHub responde   1 = ninguem responde   2 = outra coisa
+powershell -NoProfile -Command ^
+    "try { $r = Invoke-WebRequest -Uri $env:URL_APP -UseBasicParsing -TimeoutSec 3; if ($r.Content -match 'NihongoHub') { exit 0 } else { exit 2 } } catch { exit 1 }" >nul 2>&1
+set "QUEM=%errorlevel%"
+
+if "%QUEM%"=="0" (
+    echo   O NihongoHub ja esta rodando. Abrindo no Edge...
     if defined NAVEGADOR (
         start "" "%NAVEGADOR%" "%URL_APP%"
     ) else (
         start "" "%URL_APP%"
     )
     exit /b 0
+)
+
+if "%QUEM%"=="2" (
+    echo   [ERRO] A porta %PORTA% esta ocupada por outro programa.
+    echo.
+    echo   Feche o que estiver usando a porta %PORTA%, ou mude a porta em
+    echo   package.json ^(scripts dev e start^) e neste arquivo.
+    echo.
+    pause
+    exit /b 1
 )
 
 where node >nul 2>&1
@@ -55,7 +73,7 @@ if not exist "node_modules\" (
     echo.
 )
 
-echo   Iniciando o servidor... o Edge abre sozinho.
+echo   Iniciando o servidor em %URL_APP% ... o Edge abre sozinho.
 echo   Para parar: feche esta janela ou pressione Ctrl+C.
 echo.
 
