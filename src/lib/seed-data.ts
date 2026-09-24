@@ -1,14 +1,13 @@
-import { type Card, type Deck, db } from "./db";
-import { newCardState } from "./srs";
-
 /**
  * Conteúdo inicial do app.
  *
  * Um SRS vazio é inútil no primeiro acesso — o usuário abre, não tem o que
  * revisar e vai embora. Estes dois decks dão o que estudar no minuto zero.
+ *
+ * Aqui ficam só os dados; quem os grava no banco é `prisma/seed.ts`.
  */
 
-interface SeedCard {
+export interface SeedCard {
   front: string;
   reading: string;
   meaning: string;
@@ -287,14 +286,14 @@ const SAUDACOES: SeedCard[] = [
   },
 ];
 
-interface SeedDeck {
+export interface SeedDeck {
   name: string;
   description: string;
   newPerDay: number;
   cards: SeedCard[];
 }
 
-const SEED_DECKS: SeedDeck[] = [
+export const SEED_DECKS: SeedDeck[] = [
   {
     name: "Kanji N5 — Essenciais",
     description: "Os primeiros kanji do JLPT N5, com leitura e frase de exemplo.",
@@ -309,45 +308,3 @@ const SEED_DECKS: SeedDeck[] = [
   },
 ];
 
-/**
- * Popula o banco na primeira execução.
- *
- * É idempotente: se já houver qualquer deck, não faz nada — assim o usuário
- * nunca perde progresso nem ganha decks duplicados ao recarregar.
- */
-export async function seedIfEmpty(now: number = Date.now()): Promise<boolean> {
-  const existing = await db.decks.count();
-  if (existing > 0) return false;
-
-  await db.transaction("rw", db.decks, db.cards, async () => {
-    for (const [index, seed] of SEED_DECKS.entries()) {
-      const deck: Deck = {
-        id: crypto.randomUUID(),
-        name: seed.name,
-        description: seed.description,
-        newPerDay: seed.newPerDay,
-        // O deslocamento por índice mantém a ordem da lista estável: com o
-        // mesmo `createdAt` para todos, o desempate ficaria por conta do
-        // IndexedDB e os decks trocariam de lugar entre carregamentos.
-        createdAt: now + index,
-      };
-      await db.decks.add(deck);
-
-      const cards: Card[] = seed.cards.map((card) => ({
-        id: crypto.randomUUID(),
-        deckId: deck.id,
-        front: card.front,
-        reading: card.reading,
-        meaning: card.meaning,
-        example: card.example,
-        exampleMeaning: card.exampleMeaning,
-        tags: card.tags ?? [],
-        srs: newCardState(now),
-        createdAt: now,
-      }));
-      await db.cards.bulkAdd(cards);
-    }
-  });
-
-  return true;
-}

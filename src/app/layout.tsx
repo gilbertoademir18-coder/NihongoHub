@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
-import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
-import { OfflineBadge } from "@/components/offline-badge";
+import { ServiceWorkerCleanup } from "@/components/service-worker-cleanup";
 
 const inter = Inter({
   variable: "--font-sans-latin",
@@ -58,7 +57,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col font-sans">
-        <ServiceWorkerRegistrar />
+        <ServiceWorkerCleanup />
         <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-10">
           <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
             <Link href="/" className="flex items-baseline gap-2">
@@ -67,7 +66,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                 NihongoHub
               </span>
             </Link>
-            <OfflineBadge />
           </div>
         </header>
         <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>

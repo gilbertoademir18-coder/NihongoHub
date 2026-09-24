@@ -1,0 +1,94 @@
+// Schema do NihongoHub.
+//
+// A conexão vem de `prisma7.config.ts`, que lê DATABASE_URL do `.env`.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Como o usuário avaliou a própria lembrança do card.
+enum Rating {
+  again
+  hard
+  good
+  easy
+
+  @@map("rating")
+}
+
+model Deck {
+  id          String   @id @default(uuid())
+  name        String
+  description String   @default("")
+  /// Quantos cards novos podem ser introduzidos por dia.
+  newPerDay   Int      @default(10) @map("new_per_day")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  cards   Card[]
+  reviews Review[]
+
+  @@map("decks")
+}
+
+model Card {
+  id             String   @id @default(uuid())
+  deckId         String   @map("deck_id")
+  /// O que aparece na frente: um kanji, uma palavra ou uma expressão.
+  front          String
+  /// Leitura em kana.
+  reading        String
+  /// Significado em português.
+  meaning        String
+  /// Frase de exemplo — contexto ajuda mais que tradução solta.
+  example        String?
+  exampleMeaning String?  @map("example_meaning")
+  tags           String[] @default([])
+
+  // Estado do SRS, achatado em colunas em vez de um JSON: só assim o
+  // vencimento entra em índice, e a fila do dia vira uma varredura de range.
+  /// Fator de facilidade do SM-2.
+  ease         Float    @default(2.5)
+  /// Intervalo atual em dias. 0 enquanto o card não graduou.
+  intervalDays Int      @default(0) @map("interval_days")
+  repetitions  Int      @default(0)
+  /// Índice do passo de aprendizado; null significa card já graduado.
+  learningStep Int?     @map("learning_step")
+  dueAt        DateTime @map("due_at") @db.Timestamptz(3)
+  lapses       Int      @default(0)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  deck    Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  reviews Review[]
+
+  // A fila de um deck e a fila geral são as duas únicas leituras quentes.
+  @@index([deckId, dueAt])
+  @@index([dueAt])
+  @@map("cards")
+}
+
+model Review {
+  id     Int    @id @default(autoincrement())
+  cardId String @map("card_id")
+  deckId String @map("deck_id")
+  rating Rating
+
+  reviewedAt DateTime @default(now()) @map("reviewed_at") @db.Timestamptz(3)
+  /// Intervalo antes e depois: permite reconstruir a curva de aprendizado.
+  intervalBefore Int @map("interval_before")
+  intervalAfter  Int @map("interval_after")
+  /// Quanto tempo o card ficou na tela.
+  durationMs     Int @map("duration_ms")
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([reviewedAt])
+  @@index([deckId, reviewedAt])
+  @@map("reviews")
+}

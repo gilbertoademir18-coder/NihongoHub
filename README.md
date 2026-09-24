@@ -1,64 +1,103 @@
 # NihongoHub
 
-Flashcards de kanji e vocabulário japonês com repetição espaçada. PWA que
-funciona offline — feito para estudar no ônibus, sem sinal.
+Flashcards de kanji e vocabulário japonês com repetição espaçada, em Next.js 16
+com PostgreSQL.
 
 ## Começando
 
 No Windows, **dê um duplo clique em `abrir.cmd`**. Ele instala as dependências
-na primeira vez, sobe o servidor e abre o navegador sozinho quando estiver
-pronto. Para parar, feche a janela.
+na primeira vez, sobe o servidor e abre o Microsoft Edge sozinho quando
+estiver pronto. Para parar, feche a janela.
 
 Ou pela linha de comando:
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run db:migrate   # cria as tabelas
+npm run db:seed      # carrega os decks de exemplo
+npm run dev          # http://localhost:3000
 ```
-
-Na primeira abertura o app popula dois decks de exemplo (kanji N5 e saudações)
-direto no navegador. Não há cadastro nem servidor de dados.
 
 | Comando | O que faz |
 | --- | --- |
-| `abrir.cmd` | Sobe o servidor e abre o navegador (duplo clique, Windows) |
+| `abrir.cmd` | Sobe o servidor e abre o Edge (duplo clique, Windows) |
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm run build` | Build de produção |
 | `npm start` | Sobe o build de produção |
 | `npm test` | Testes do agendamento SRS |
 | `npm run lint` | ESLint (inclui as regras do React Compiler) |
+| `npm run db:migrate` | Aplica as migrações pendentes |
+| `npm run db:seed` | Carrega os decks de exemplo (idempotente) |
+| `npm run db:studio` | Abre o Prisma Studio para navegar nos dados |
 | `npm run icons` | Regenera os ícones do PWA em `public/` |
+
+## Banco de dados
+
+PostgreSQL 17 local, acessado via Prisma 7. A conexão fica em `.env`, que o
+`.gitignore` cobre.
+
+```
+postgresql://nihongohub:<senha>@127.0.0.1:5432/nihongohub?options=-c%20timezone%3DUTC
+```
+
+O usuário `nihongohub` é dono apenas deste banco: **não é superusuário** e não
+enxerga os outros bancos do servidor. Ele tem `CREATEDB` porque o Prisma
+Migrate cria um banco sombra temporário para calcular o diff das migrações.
+
+### `timezone=UTC` na connection string não é decoração
+
+O driver envia os timestamps em UTC **sem rótulo de fuso**. Com a sessão em
+`America/Sao_Paulo`, o Postgres os lia como hora local e gravava todo
+agendamento 3 horas adiantado — de forma silenciosa, porque o mesmo desvio era
+aplicado na leitura e o app parecia consistente consigo mesmo. Só aparecia ao
+consultar os dados por fora, em SQL.
+
+As colunas de data são `TIMESTAMPTZ`, e não `timestamp`, pelo mesmo motivo: um
+instante sem fuso é um instante ambíguo.
+
+Para conferir que continua correto depois de mudar driver, fuso ou servidor:
+
+```bash
+npx tsx --env-file=.env scripts/diagnostico-fuso.ts
+```
+
+Os três números precisam dar ~0. Se não derem, os agendamentos estão sendo
+gravados num fuso e lidos em outro.
 
 ## Como está montado
 
 ```
 src/
   lib/
-    srs.ts        Algoritmo de agendamento (SM-2). Funções puras, sem I/O.
-    srs.test.ts   30 testes cobrindo aprendizado, lapsos, tetos e previews.
-    db.ts         IndexedDB via Dexie: decks, cards e histórico de revisões.
-    seed.ts       Conteúdo inicial — sem ele o primeiro acesso é uma tela vazia.
-    bootstrap.ts  Garante que o seed rode uma vez só.
-  components/     Sessão de estudo, cards de deck, suporte a offline.
-  app/            Rotas (App Router) + manifest do PWA.
-public/sw.js      Service worker: põe a casca do app em cache.
+    srs.ts          Algoritmo de agendamento (SM-2). Funções puras, sem I/O.
+    srs.test.ts     30 testes cobrindo aprendizado, lapsos, tetos e previews.
+    prisma.ts       Cliente Prisma com driver adapter.
+    seed-data.ts    O conteúdo dos decks iniciais (só dados).
+    server/
+      study.ts      Leituras do banco para as telas. Marcado `server-only`.
+  components/       Sessão de estudo e cards de deck.
+  app/
+    actions.ts      Server Action que registra a revisão.
+    page.tsx        Home (Server Component).
+    study/          Sessão de estudo.
+prisma/
+  schema.prisma     Modelos e índices.
+  migrations/       Histórico versionado do schema.
+  seed.ts           Popula os decks iniciais.
+scripts/
+  diagnostico-fuso.ts  Verifica a coerência de fuso entre Node e Postgres.
 ```
 
-### Local-first, e por quê
+### O algoritmo fica fora do banco
 
-O IndexedDB é a **fonte de verdade**. Um SRS precisa responder no instante em
-que você toca o botão, e a fila do dia não pode depender de ida e volta ao
-servidor — senão o app morre justamente onde ele mais serve: no metrô.
+`srs.ts` não conhece Prisma, React nem navegador — recebe o estado do card e
+devolve o próximo. Foi o que permitiu trocar toda a camada de persistência
+(era IndexedDB no navegador) sem alterar uma linha do agendamento: os 30
+testes continuaram passando durante a migração inteira.
 
-Isso significa, hoje:
-
-- todo o estudo funciona sem rede, inclusive recarregando a página;
-- os dados vivem **naquele navegador** — não há sincronização entre aparelhos;
-- limpar os dados do site apaga o progresso.
-
-Um sync opcional pode ser encaixado por cima depois (o histórico em `reviews`
-já guarda o que seria preciso para reconciliar), sem mexer na experiência de
-estudo.
+O agendamento roda no **servidor**, dentro da mesma transação que grava o
+histórico. Se uma falhar, as duas voltam atrás e o histórico nunca discorda do
+estado do card.
 
 ### O agendamento
 
@@ -78,8 +117,7 @@ resultado confundem quem está estudando.
 
 O japonês usa a fonte **do sistema** (Hiragino, Yu Gothic, Noto CJK conforme a
 plataforma). Empacotar a Noto Sans JP custava 5,5 MB em 131 fatias baixadas sob
-demanda — inviável num app que precisa funcionar offline. O latino usa Inter,
-que tem subset pequeno.
+demanda. O latino usa Inter, que tem subset pequeno.
 
 ## Atalhos de teclado
 
@@ -88,23 +126,31 @@ que tem subset pequeno.
 | `espaço` / `enter` | Mostrar a resposta |
 | `1` `2` `3` `4` | De novo · Difícil · Bom · Fácil |
 
-## Testando o PWA
+## Notas
 
-O service worker só é registrado em produção — em desenvolvimento ele serviria
-build antigo e esconderia suas mudanças.
+**O app precisa do servidor.** Uma versão anterior guardava tudo em IndexedDB
+e funcionava offline; hoje o Postgres é a fonte de verdade e cada resposta vai
+ao servidor. O service worker daquela versão é removido automaticamente do
+navegador de quem usou o app antes — veja
+`src/components/service-worker-cleanup.tsx`.
 
-```bash
-npm run build && npm start
-```
+**`npm audit` acusa `mysql2` e `deepmerge-ts`.** Ambos entram pelo CLI do
+Prisma. As falhas do `mysql2` exigem conectar a um servidor MySQL malicioso, e
+o nosso datasource é PostgreSQL — esse código nunca é carregado. O
+`deepmerge-ts` é alimentado pela nossa própria config. O `audit fix --force`
+faria downgrade para o Prisma 6, com breaking changes; por isso ficamos na
+7.10.0.
 
-Depois, no DevTools: **Application → Service Workers** para ver o registro, e
-**Network → Offline** para conferir que o app abre e revisa sem rede.
+**A tag `latest` do pacote `prisma` aponta para um release candidate** da
+versão 8. As versões estão fixadas em `^7.10.0` de propósito, CLI e client
+alinhados.
 
 ## Próximos passos
 
 - Criar e editar decks e cards pela interface (hoje só via seed)
-- Importar/exportar decks (`.apkg` do Anki ou CSV)
-- Limite de cards novos por dia — o campo `newPerDay` já existe, mas ainda não
-  é aplicado na montagem da fila
-- Tela de estatísticas (`getReviewHistory` já devolve os dados)
-- Sincronização entre aparelhos
+- Contas de usuário — hoje o banco não separa por pessoa
+- Limite de cards novos por dia: o campo `newPerDay` existe, mas ainda não é
+  aplicado na montagem da fila
+- Tela de estatísticas a partir da tabela `reviews`
+- Resposta otimista na sessão de estudo, para o próximo card aparecer sem
+  esperar o round-trip

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type Card, getDueCards, reviewCard } from "@/lib/db";
-import { ensureSeeded } from "@/lib/bootstrap";
+import { revisarCard } from "@/app/actions";
+import type { CardEstudo } from "@/lib/server/study";
 import { type Rating, formatDelay, previewIntervals } from "@/lib/srs";
 
 /**
@@ -44,33 +44,24 @@ const RATINGS: { rating: Rating; label: string; key: string; className: string }
 ];
 
 export function StudySession({
-  deckId = null,
+  filaInicial,
   deckName,
 }: {
-  deckId?: string | null;
+  filaInicial: CardEstudo[];
   deckName?: string;
 }) {
-  const [queue, setQueue] = useState<Card[] | null>(null);
+  const [queue, setQueue] = useState(filaInicial);
   const [revealed, setRevealed] = useState(false);
   const [reviewed, setReviewed] = useState(0);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
   /** Quando o card atual apareceu — vira o tempo de resposta no histórico. */
   const shownAt = useRef(0);
   /** Evita que dois toques rápidos avaliem o mesmo card duas vezes. */
   const busy = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    ensureSeeded()
-      .then(() => getDueCards(deckId))
-      .then((cards) => {
-        if (!cancelled) setQueue(cards);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [deckId]);
-
-  const current = queue?.[0] ?? null;
+  const current = queue[0] ?? null;
 
   // O cronômetro reinicia a cada card exibido. `reviewed` entra como
   // dependência porque um card pode voltar logo em seguida a si mesmo
@@ -83,29 +74,35 @@ export function StudySession({
     async (rating: Rating) => {
       if (!current || busy.current) return;
       busy.current = true;
+      setSalvando(true);
+      setErro(null);
 
       const duration = Date.now() - shownAt.current;
 
       try {
-        const updated = await reviewCard(current.id, rating, duration);
+        // O agendamento é calculado e gravado no servidor; aqui só usamos o
+        // card que volta de lá para decidir se ele reaparece nesta sessão.
+        const atualizado = await revisarCard(current.id, rating, duration);
 
         setQueue((prev) => {
-          if (!prev) return prev;
           const rest = prev.slice(1);
-
-          // Ainda vence dentro desta sessão? Então volta para a fila, algumas
-          // posições à frente, para não reaparecer imediatamente.
-          if (updated.srs.dueAt <= Date.now() + SESSION_HORIZON_MS) {
+          if (atualizado.srs.dueAt <= Date.now() + SESSION_HORIZON_MS) {
             const at = Math.min(REINSERT_GAP, rest.length);
-            return [...rest.slice(0, at), updated, ...rest.slice(at)];
+            return [...rest.slice(0, at), atualizado, ...rest.slice(at)];
           }
           return rest;
         });
 
         setReviewed((n) => n + 1);
         setRevealed(false);
+      } catch {
+        // Sem o servidor não há como registrar a revisão. Mantemos o card na
+        // tela para a pessoa tentar de novo, em vez de seguir adiante e
+        // perder a resposta silenciosamente.
+        setErro("Não foi possível salvar. Verifique a conexão e tente de novo.");
       } finally {
         busy.current = false;
+        setSalvando(false);
       }
     },
     [current],
@@ -118,6 +115,7 @@ export function StudySession({
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (busy.current) return;
 
       if (!revealed) {
         if (event.key === " " || event.key === "Enter") {
@@ -137,12 +135,6 @@ export function StudySession({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [current, revealed, answer]);
-
-  if (queue === null) {
-    return (
-      <div className="h-64 animate-pulse rounded-xl border border-border bg-surface-muted" />
-    );
-  }
 
   if (!current) {
     return <SessionDone reviewed={reviewed} deckName={deckName} />;
@@ -184,14 +176,24 @@ export function StudySession({
         )}
       </article>
 
+      {erro && (
+        <p
+          role="alert"
+          className="rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-sm text-accent"
+        >
+          {erro}
+        </p>
+      )}
+
       {revealed ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {RATINGS.map(({ rating, label, key, className }) => (
             <button
               key={rating}
               type="button"
+              disabled={salvando}
               onClick={() => void answer(rating)}
-              className={`flex flex-col items-center gap-0.5 rounded-lg border px-3 py-3 text-sm font-semibold transition-colors ${className}`}
+              className={`flex flex-col items-center gap-0.5 rounded-lg border px-3 py-3 text-sm font-semibold transition-colors disabled:opacity-50 ${className}`}
             >
               <span>{label}</span>
               <span className="text-xs font-normal opacity-70 tabular-nums">

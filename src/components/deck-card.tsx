@@ -1,15 +1,13 @@
-"use client";
-
 import Link from "next/link";
-import { useLiveQuery } from "dexie-react-hooks";
-import { type Deck, getDeckStats } from "@/lib/db";
+import type { DeckComStats } from "@/lib/server/study";
 
-/** Um deck na lista da home, com o resumo do que está esperando nele. */
-export function DeckCard({ deck }: { deck: Deck }) {
-  const stats = useLiveQuery(() => getDeckStats(deck.id), [deck.id]);
-
-  const due = stats?.due ?? 0;
-
+/**
+ * Um deck na lista da home, com o resumo do que está esperando nele.
+ *
+ * Recebe as estatísticas já prontas em vez de buscá-las: quem monta a lista
+ * traz as contagens de todos os decks numa consulta agregada só.
+ */
+export function DeckCard({ deck }: { deck: DeckComStats }) {
   return (
     <Link
       href={`/study?deck=${deck.id}`}
@@ -21,29 +19,27 @@ export function DeckCard({ deck }: { deck: Deck }) {
           <p className="mt-0.5 text-sm text-muted">{deck.description}</p>
         </div>
 
-        {due > 0 && (
+        {deck.due > 0 && (
           <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent tabular-nums">
-            {due} {due === 1 ? "vencido" : "vencidos"}
+            {deck.due} {deck.due === 1 ? "vencido" : "vencidos"}
           </span>
         )}
       </div>
 
-      {stats && (
-        <dl className="mt-3 flex gap-4 text-xs text-muted tabular-nums">
-          <div className="flex gap-1">
-            <dt>Total</dt>
-            <dd className="font-medium text-foreground">{stats.total}</dd>
-          </div>
-          <div className="flex gap-1">
-            <dt>Novos</dt>
-            <dd className="font-medium text-foreground">{stats.fresh}</dd>
-          </div>
-          <div className="flex gap-1">
-            <dt>Aprendendo</dt>
-            <dd className="font-medium text-foreground">{stats.learning}</dd>
-          </div>
-        </dl>
-      )}
+      <dl className="mt-3 flex gap-4 text-xs text-muted tabular-nums">
+        <div className="flex gap-1">
+          <dt>Total</dt>
+          <dd className="font-medium text-foreground">{deck.total}</dd>
+        </div>
+        <div className="flex gap-1">
+          <dt>Novos</dt>
+          <dd className="font-medium text-foreground">{deck.fresh}</dd>
+        </div>
+        <div className="flex gap-1">
+          <dt>Aprendendo</dt>
+          <dd className="font-medium text-foreground">{deck.learning}</dd>
+        </div>
+      </dl>
     </Link>
   );
 }

@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+
+# Documentacao do Prisma para assistentes de IA (gerada por `prisma init`).
+# Regeneravel, e os symlinks em .claude/skills usam caminhos absolutos que
+# nao sobrevivem a um clone em outra maquina.
+/.agents/
+/.claude/skills/
+/skills-lock.json
