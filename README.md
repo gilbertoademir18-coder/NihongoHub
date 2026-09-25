@@ -511,6 +511,27 @@ muda acontece no mesmo "Salvar", e fechar sem salvar desfaz tudo. O arquivo no
 disco é apagado quando a imagem é trocada, removida ou o card é excluído —
 ninguém varre a pasta, então o que ficasse ficaria para sempre.
 
+## O banco em casa, acessado pelo tailnet
+
+O Postgres mora numa máquina só (a de casa) e as duas máquinas de trabalho
+falam com ele pelo Tailscale — assim o progresso de estudo é um só. O passo a
+passo, com o que abrir no firewall e o que dói no arranjo, está em
+**[docs/banco-em-casa.md](docs/banco-em-casa.md)**.
+
+Quatro comandos sustentam isso:
+
+| Comando | O que faz |
+| --- | --- |
+| `npm run backup` | Dump em `backups\`, verificado abrindo o arquivo depois de gravar |
+| `.\scripts
+estaurar-banco.ps1` | Cria papel e banco numa máquina nova e restaura o dump |
+| `.\scriptsbrir-banco-no-tailnet.ps1` | `listen_addresses`, `pg_hba.conf` e firewall, restritos à faixa do Tailscale |
+| `npm run imagens:conferir` | Acha card apontando para imagem que não está nesta máquina |
+
+O último existe porque **imagem de card é arquivo, não linha no banco**: com o
+banco compartilhado e os arquivos em `public/cards/`, enviar uma imagem numa
+máquina deixa a outra com o card sem imagem até o `git pull`.
+
 ## Notas
 
 **O app precisa do servidor.** Uma versão anterior guardava tudo em IndexedDB

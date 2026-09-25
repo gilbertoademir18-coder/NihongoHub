@@ -15,7 +15,9 @@
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
     "postinstall": "prisma generate",
-    "imagens": "tsx --env-file=.env scripts/buscar-imagens.ts"
+    "imagens": "tsx --env-file=.env scripts/buscar-imagens.ts",
+    "imagens:conferir": "tsx --env-file=.env scripts/conferir-imagens.ts",
+    "backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup-banco.ps1"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
