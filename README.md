@@ -63,6 +63,23 @@ O ícone fica **cinza enquanto o servidor sobe** e volta a cor quando a porta
 atende: de relance, perto do relógio, isso responde "dá para estudar agora?"
 sem precisar parar o mouse em cima.
 
+### `-WindowStyle Hidden` não esconde mais nada
+
+No Windows 11 quem hospeda o console é o Windows Terminal, e a janela pertence
+a ele: o PowerShell pede para esconder a própria janela e o pedido não tem a
+quem chegar. O resultado é um terminal aberto a sessão inteira — exatamente o
+que o ícone existe para evitar.
+
+Esconder a janela é a abordagem errada; a certa é **não ter janela**. O
+`tray.ps1` relança a si mesmo com `CreateNoWindow` e sai, e o processo novo
+nasce sem console: não há janela para esconder nem host para hospedá-la, e
+nenhum terminal padrão muda isso. É o mesmo mecanismo que já era usado para
+subir o `next dev` sem janela.
+
+Por isso o `NihongoHub.cmd` chama o PowerShell **sem `start`**: assim ele roda
+no console que já existe em vez de abrir outro, e como o relançamento devolve
+o controle na hora, a janela do `.cmd` fecha sozinha.
+
 A saída vai para `%LOCALAPPDATA%\NihongoHub\servidor.log`, fora da árvore do
 projeto — o `.next` é apagado a cada build, e um log versionado só sujaria o
 `git status`. Cada partida do servidor recomeça o arquivo.

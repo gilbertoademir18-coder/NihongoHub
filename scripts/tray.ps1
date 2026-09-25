@@ -18,9 +18,37 @@
 # exportados por módulos e descobertos por terceiros — nada disso se aplica a
 # funções privadas de um script que ninguém importa.
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-param()
+param(
+    # Uso interno: marca o relançamento que já nasceu sem console. Ver abaixo.
+    [switch]$SemConsole
+)
 
 $ErrorActionPreference = "Stop"
+
+<#
+    Sem console — de verdade.
+
+    `-WindowStyle Hidden` não basta no Windows 11: quem hospeda o console é o
+    Windows Terminal, e a janela pertence a ele. O PowerShell pede para
+    esconder a própria janela, o pedido não tem a quem chegar, e sobra um
+    terminal aberto a sessão inteira — exatamente o que este script existe
+    para evitar.
+
+    Esconder a janela é a abordagem errada; a certa é não ter janela. Aqui o
+    script relança a si mesmo com CREATE_NO_WINDOW (o `CreateNoWindow` abaixo)
+    e sai. O processo novo nasce sem console: não há janela para esconder nem
+    host para hospedá-la, e nenhum terminal padrão muda isso.
+#>
+if (-not $SemConsole) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName        = Join-Path $PSHOME "powershell.exe"
+    $psi.Arguments       = "-NoProfile -ExecutionPolicy Bypass -STA -File `"$PSCommandPath`" -SemConsole"
+    $psi.WorkingDirectory = Split-Path -Parent $PSScriptRoot
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow  = $true
+    [System.Diagnostics.Process]::Start($psi) | Out-Null
+    exit 0
+}
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing

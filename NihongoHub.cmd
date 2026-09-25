@@ -37,10 +37,12 @@ if not exist "node_modules\" (
     )
 )
 
-rem -WindowStyle Hidden esconde o console do PowerShell; -ExecutionPolicy
-rem Bypass evita depender da politica da maquina, que no Windows 11 barra
-rem scripts por padrao. Sem /b: o tray precisa sobreviver ao fim desta
-rem janela, e com /b ele herdaria este console e morreria junto.
-start "" powershell -NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File "%~dp0scripts\tray.ps1"
+rem Sem `start`: isto roda no console que ja existe, em vez de abrir outro.
+rem O tray.ps1 se relanca sem console nenhum e devolve o controle na hora,
+rem entao esta janela fecha sozinha em vez de ficar aberta a sessao inteira.
+rem
+rem -ExecutionPolicy Bypass evita depender da politica da maquina, que no
+rem Windows 11 barra scripts por padrao.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\tray.ps1"
 
 endlocal
