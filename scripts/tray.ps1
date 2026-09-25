@@ -197,6 +197,8 @@ function Novo-Icone([bool]$apagado) {
 
 $script:proc         = $null
 $script:desde        = Get-Date
+# Só o clique em "Abrir no Edge" liga isto. O navegador nunca abre por conta
+# própria: nem ao subir, nem ao adotar um servidor que já estava rodando.
 $script:abrirAoSubir = $false
 
 <#
@@ -385,7 +387,7 @@ function Marcar([string]$novo) {
         }
         "no-ar" {
             $bandeja.Icon = $iconeVivo
-            $bandeja.Text = "NihongoHub — no ar em localhost:$PORTA"
+            $bandeja.Text = "NihongoHub — no ar. Clique duas vezes para abrir."
         }
         "parado" {
             $bandeja.Icon = $iconeApagado
@@ -485,7 +487,7 @@ $relogio.add_Tick({
     if ($script:estado -eq "subindo") {
         if ($ouvindo) {
             Marcar "no-ar"
-            Avisar "Servidor no ar em localhost:$PORTA" "Info"
+            Avisar "Servidor no ar em localhost:$PORTA. Clique no ícone para abrir." "Info"
             if ($script:abrirAoSubir) {
                 Abrir-Navegador
                 $script:abrirAoSubir = $false
@@ -522,7 +524,6 @@ if (Porta-Ouvindo) {
         # Já havia um servidor rodando — de um NihongoHub.cmd antigo, por exemplo.
         # Adotamos em vez de subir outro: a porta é uma só.
         Marcar "no-ar"
-        Abrir-Navegador
     } else {
         $bandeja.Visible = $false
         [System.Windows.Forms.MessageBox]::Show(
@@ -531,9 +532,12 @@ if (Porta-Ouvindo) {
         exit 1
     }
 } else {
-    $script:abrirAoSubir = $true
+    # Sobe o servidor, e só. O navegador é sempre um pedido explícito: este
+    # ícone existe para o app estar de pé quando você quiser, e ele sobe junto
+    # com o Windows — abrir uma janela por cima do que você estiver fazendo
+    # seria o oposto de ficar fora do caminho.
     Iniciar-Servidor
-    Avisar "Subindo o servidor... o Edge abre sozinho." "Info"
+    Avisar "Subindo o servidor. Clique no ícone para abrir." "Info"
 }
 
 [System.Windows.Forms.Application]::Run()

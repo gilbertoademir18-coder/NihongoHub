@@ -6,13 +6,17 @@ com PostgreSQL.
 ## Começando
 
 No Windows, **dê um duplo clique em `NihongoHub.cmd`**. Ele instala as
-dependências na primeira vez, sobe o servidor e abre o Microsoft Edge sozinho
-quando estiver pronto.
+dependências na primeira vez e sobe o servidor.
 
 O servidor não fica numa janela: ele vira um **ícone na bandeja**, perto do
-relógio. Clique com o botão direito para abrir o app, reiniciar o servidor,
-ver o log ou sair — e é o "Sair" que encerra tudo. Marcando **Iniciar com o
-Windows**, ele já está de pé quando você senta para estudar.
+relógio. **Duplo clique no ícone abre o app**; o botão direito traz reiniciar o
+servidor, ver o log e sair — e é o "Sair" que encerra tudo. Marcando **Iniciar
+com o Windows**, ele já está de pé quando você senta para estudar.
+
+O navegador **nunca abre sozinho**. O ícone sobe junto com o Windows e o
+servidor fica pronto em segundo plano; abrir uma janela por cima do que você
+estiver fazendo seria o oposto de ficar fora do caminho. Quando quiser estudar,
+o clique é seu.
 
 Ou pela linha de comando:
 
@@ -53,7 +57,7 @@ bandeja. Não há dependência nova: o WinForms já vem com o Windows.
 
 | Item do menu | O que faz |
 | --- | --- |
-| **Abrir no Edge** | Abre o app; com o servidor parado, sobe ele antes |
+| **Abrir no Edge** | Abre o app — o único caminho até o navegador. Com o servidor parado, sobe ele antes |
 | Abrir no VS Code | Abre `NihongoHub.code-workspace` — ou a pasta, se ele não existir |
 | Reiniciar o servidor | Derruba e sobe de novo — útil ao mexer em `.env` ou no schema |
 | Iniciar com o Windows | Liga e desliga a subida automática no login |
@@ -122,7 +126,7 @@ depois do filho, o que não é parentesco e sim um PID reciclado pelo Windows.
 
 | Comando | O que faz |
 | --- | --- |
-| `NihongoHub.cmd` | Põe o NihongoHub na bandeja e abre o Edge (duplo clique, Windows) |
+| `NihongoHub.cmd` | Põe o NihongoHub na bandeja (duplo clique, Windows) |
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm run build` | Build de produção |
 | `npm start` | Sobe o build de produção |
