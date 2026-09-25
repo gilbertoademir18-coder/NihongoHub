@@ -31,18 +31,22 @@ const NOMES: Record<string, string> = {
 };
 
 /**
- * Busca de imagens pelo texto japonês do card.
+ * Busca de imagens no Google, pelo termo que for.
  *
- * Pelo japonês, e não pelo significado, porque é exatamente aí que o buscador
- * grande ganha do nosso: `ごはん` devolve a tigela de arroz japonesa, enquanto
- * "rice" devolveria um saco de grãos. A curadoria do `npm run imagens` existe
- * para contornar as buscas ambíguas; aqui quem desempata é você, olhando.
+ * São dois links, e não um, porque nenhum dos dois ganha sempre. Em japonês o
+ * resultado é culturalmente certo — `ごはん` devolve a tigela de arroz
+ * japonesa, onde "arroz" devolveria um saco de grãos. Mas kana curto é escrita
+ * fonética e colide com nome próprio: `あい` (amor) devolve só gente famosa
+ * chamada Ai, e aí é a tradução que salva.
  *
- * `udm=2` é a aba de imagens — o antigo `tbm=isch` ainda funciona, mas
- * redireciona.
+ * Qual serve depende da palavra, e descobrir isso de olho custa um clique.
+ * Escolher por você custaria a imagem errada.
+ *
+ * `udm=2` é a aba de imagens — o antigo `tbm=isch` ainda funciona, mas é
+ * reescrito no caminho.
  */
-function buscaNoGoogle(front: string) {
-  return `https://www.google.com/search?udm=2&q=${encodeURIComponent(front.trim())}`;
+function buscaNoGoogle(termo: string) {
+  return `https://www.google.com/search?udm=2&q=${encodeURIComponent(termo.trim())}`;
 }
 
 export function CardForm({
@@ -101,6 +105,8 @@ export function CardForm({
   // conta é o do próprio campo, lido do FormData no servidor.
   const [front, setFront] = useState(card?.front ?? "");
   const [reading, setReading] = useState(card?.reading ?? "");
+  // Em estado só para alimentar o link de busca pela tradução.
+  const [meaning, setMeaning] = useState(card?.meaning ?? "");
 
   // A imagem escolhida ainda não subiu: é só o arquivo local, para ver o que
   // vai ser enviado antes de enviar.
@@ -194,7 +200,8 @@ export function CardForm({
         <input
           id="meaning"
           name="meaning"
-          defaultValue={card?.meaning ?? ""}
+          value={meaning}
+          onChange={(e) => setMeaning(e.target.value)}
           className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
           autoComplete="off"
         />
@@ -309,16 +316,14 @@ export function CardForm({
               )}
             </p>
 
-            {front.trim() && (
-              <p className="mt-1 text-xs">
-                <a
-                  href={buscaNoGoogle(front)}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="text-accent hover:underline"
-                >
-                  Procurar <span className="jp">{front.trim()}</span> no Google Imagens ↗
-                </a>
+            {(front.trim() || meaning.trim()) && (
+              <p className="mt-1 text-xs text-muted">
+                Procurar no Google Imagens:{" "}
+                {front.trim() && (
+                  <LinkDeBusca termo={front} className="jp" />
+                )}
+                {front.trim() && meaning.trim() && " · "}
+                {meaning.trim() && <LinkDeBusca termo={meaning} />}
               </p>
             )}
 
@@ -409,6 +414,20 @@ function Previa({
           : "Sem silabário próprio — fica fora dos filtros de hiragana e katakana."}
       </p>
     </div>
+  );
+}
+
+/** Um dos termos de busca, já apontando para a aba de imagens. */
+function LinkDeBusca({ termo, className }: { termo: string; className?: string }) {
+  return (
+    <a
+      href={buscaNoGoogle(termo)}
+      target="_blank"
+      rel="noreferrer noopener"
+      className={`text-accent hover:underline ${className ?? ""}`}
+    >
+      {termo.trim()} ↗
+    </a>
   );
 }
 

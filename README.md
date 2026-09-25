@@ -458,12 +458,22 @@ um seletor de arquivo, e a imagem enviada substitui a baixada. Vale no cadastro,
 na lista e no modal que abre no meio da sessão de estudo — inclusive quando a
 imagem automática veio errada e você já tem a certa na mão.
 
-Ao lado do seletor há um link que abre o **Google Imagens já buscando pelo
-texto japonês do card** — pelo japonês, e não pelo significado, porque é aí que
-o buscador grande ganha do nosso: `アイス` devolve sorvete japonês de verdade,
-enquanto "ice cream" devolveria casquinha americana. O link usa `udm=2`, que é
-a aba de imagens atual; o antigo `tbm=isch` ainda funciona, mas é reescrito no
-caminho.
+Ao lado do seletor há **dois links para o Google Imagens**, um buscando pelo
+japonês da frente e outro pela tradução. São dois porque nenhum dos dois ganha
+sempre:
+
+| Card | Buscando em japonês | Buscando pela tradução |
+| --- | --- | --- |
+| `アイス` (sorvete) | **sorvete japonês de verdade** — konbini, soft cream | "ice cream" traria casquinha americana |
+| `あい` (amor) | a cantora AI, um personagem de anime, uma lutadora — nenhum coração | **"amor": casais, corações, o quadro da Wikipédia** |
+
+É a mesma colisão de duas moras da tabela acima, agora do outro lado: kana
+curto é escrita fonética e casa com nome próprio antes de casar com a palavra.
+Qual dos dois links serve depende da palavra, e ver isso custa um clique —
+escolher por você custaria a imagem errada.
+
+Os links usam `udm=2`, a aba de imagens atual; o antigo `tbm=isch` ainda
+funciona, mas é reescrito no caminho.
 
 Uma ressalva que o caminho automático não tem: imagem achada no Google **não
 vem com licença nem autor**, e o crédito gravado vira "Imagem enviada por você"
