@@ -138,6 +138,23 @@ export interface EstadoDoForm {
   erros: ErrosDoCard;
   /** Erro que não pertence a nenhum campo — deck apagado, card sumido. */
   mensagem?: string;
+  /**
+   * O card já gravado, quando a edição acontece em modal.
+   *
+   * Em página o sucesso é um `redirect`, e nada precisa voltar. Em modal não
+   * há para onde ir: quem abriu o modal continua na tela de trás, e precisa
+   * destes campos para mostrar o texto novo sem recarregar — durante uma
+   * sessão de estudo, recarregar seria perder a fila.
+   */
+  salvo?: CardSalvo;
+}
+
+/** O que muda na tela de trás depois de salvar. */
+export interface CardSalvo {
+  id: string;
+  front: string;
+  reading: string;
+  meaning: string;
 }
 
 export const ESTADO_INICIAL: EstadoDoForm = { erros: {} };

@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { salvarCard } from "@/app/cards/actions";
-import { ESTADO_INICIAL, type EstadoDoForm, scriptDoCard } from "@/lib/card-form";
+import {
+  type CardSalvo,
+  ESTADO_INICIAL,
+  type EstadoDoForm,
+  scriptDoCard,
+} from "@/lib/card-form";
 import { SEPARADOR_LEITURAS } from "@/lib/kana";
 import { kanaParaRomaji } from "@/lib/romaji";
 import type { CardParaEditar } from "@/lib/server/cards";
@@ -27,14 +32,35 @@ export function CardForm({
   decks,
   card,
   deckPadrao,
+  aoSalvar,
+  aoCancelar,
 }: {
   decks: DeckSimples[];
   /** Ausente = cadastro novo. */
   card?: CardParaEditar;
   deckPadrao?: string;
+  /**
+   * Presente = o formulário está num modal.
+   *
+   * Sem isto, salvar termina em `redirect`. Num modal não há para onde ir: a
+   * tela de trás continua lá, e pode ser uma sessão de estudo cuja fila vive
+   * na memória — navegar a perderia.
+   */
+  aoSalvar?: (salvo: CardSalvo) => void;
+  /** Fechar o modal sem gravar. Ignorado fora dele. */
+  aoCancelar?: () => void;
 }) {
+  const emModal = Boolean(aoSalvar);
+
+  // O aviso ao pai sai de dentro da própria ação, e não de um efeito que
+  // observa o estado: efeito rodaria de novo a cada renderização com o mesmo
+  // estado, e fechar o modal duas vezes é o tipo de bug que só aparece depois.
   const [estado, enviar, enviando] = useActionState<EstadoDoForm, FormData>(
-    salvarCard,
+    async (anterior, form) => {
+      const resultado = await salvarCard(anterior, form);
+      if (resultado.salvo) aoSalvar?.(resultado.salvo);
+      return resultado;
+    },
     ESTADO_INICIAL,
   );
 
@@ -49,6 +75,7 @@ export function CardForm({
   return (
     <form action={enviar} className="space-y-5">
       {card && <input type="hidden" name="id" value={card.id} />}
+      <input type="hidden" name="contexto" value={emModal ? "modal" : "pagina"} />
 
       {estado.mensagem && (
         <p
@@ -185,9 +212,19 @@ export function CardForm({
         >
           {enviando ? "Salvando..." : card ? "Salvar alterações" : "Cadastrar card"}
         </button>
-        <Link href={voltarPara} className="text-sm text-muted hover:underline">
-          Cancelar
-        </Link>
+        {emModal ? (
+          <button
+            type="button"
+            onClick={aoCancelar}
+            className="text-sm text-muted hover:underline"
+          >
+            Cancelar
+          </button>
+        ) : (
+          <Link href={voltarPara} className="text-sm text-muted hover:underline">
+            Cancelar
+          </Link>
+        )}
       </div>
     </form>
   );

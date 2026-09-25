@@ -306,6 +306,22 @@ declaradas com motivo em `src/lib/kana.ts`: `を` só existe como partícula
 daí se cadastra, edita e exclui. Chega pela home ("Gerenciar cards") ou pelo
 link "Cards" de cada deck.
 
+**Editar acontece em modal**, e não em outra página. O motivo está na sessão de
+estudo: a fila vive na memória do navegador, então navegar até uma tela de
+edição a perderia — você voltaria ao começo depois de consertar uma vírgula. Por
+isso o bloco de resposta, no fim de cada card, tem um **"Editar este card"**: o
+momento em que se percebe que a leitura está errada é justamente o de ver a
+resposta, e consertar ali evita terminar a sessão com uma lista de coisas a
+arrumar depois.
+
+Salvar pelo modal atualiza o texto na tela de trás sem recarregar. Na lista é um
+`router.refresh()`; na sessão, os campos gravados voltam da Server Action e
+substituem os do card em memória — recarregar ali custaria a sessão inteira.
+
+O modal é o `<dialog>` nativo: Esc fecha, o foco fica preso dentro e o resto da
+página vira inerte sem nenhum código nosso. Refazer isso à mão é onde nascem os
+modais que o leitor de tela atravessa.
+
 O **silabário não é um campo**: sai da frente do card. `ねこ` é hiragana,
 `コーヒー` é katakana, e `日` ou `ねこカフェ` não são nenhum dos dois — ficam de
 fora dos filtros, que é o correto, porque uma sessão "só hiragana" que mostrasse

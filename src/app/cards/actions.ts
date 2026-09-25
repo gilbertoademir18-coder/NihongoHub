@@ -12,6 +12,12 @@ import {
   validarCard,
 } from "@/lib/card-form";
 import { prisma } from "@/lib/prisma";
+import {
+  type CardParaEditar,
+  type DeckSimples,
+  buscarCardParaEditar,
+  listarDecksSimples,
+} from "@/lib/server/cards";
 import { newCardState } from "@/lib/srs";
 
 /**
@@ -21,6 +27,41 @@ import { newCardState } from "@/lib/srs";
  * Action chega pela rede e vale como entrada externa, por mais que só a nossa
  * tela o envie.
  */
+
+/**
+ * Editar em modal ou em página.
+ *
+ * Em página, salvar termina em `redirect`. Em modal não há para onde ir — a
+ * tela de trás continua lá, e pode ser uma sessão de estudo cuja fila vive na
+ * memória do navegador: navegar a perderia.
+ */
+type Contexto = "pagina" | "modal";
+
+function lerContexto(form: FormData): Contexto {
+  return form.get("contexto") === "modal" ? "modal" : "pagina";
+}
+
+/**
+ * Carrega um card e a lista de decks para o modal de edição.
+ *
+ * O modal abre a partir de uma tela que não tem esses dados — a sessão de
+ * estudo carrega só o que ela usa. Buscar na hora de abrir evita puxar
+ * exemplo, etiquetas e termo de imagem de todo card da fila para o caso de
+ * alguém querer editar um.
+ */
+export async function carregarCardParaEdicao(
+  id: string,
+): Promise<{ card: CardParaEditar; decks: DeckSimples[] } | null> {
+  const limpo = String(id ?? "").trim();
+  if (!limpo) return null;
+
+  const [card, decks] = await Promise.all([
+    buscarCardParaEditar(limpo),
+    listarDecksSimples(),
+  ]);
+  if (!card) return null;
+  return { card, decks };
+}
 
 function lerFormulario(form: FormData): DadosDoCard {
   const texto = (campo: string) => String(form.get(campo) ?? "");
@@ -86,6 +127,7 @@ export async function salvarCard(
     script: scriptDoCard(dados.front),
   };
 
+  let salvoId = id;
   if (id) {
     const existente = await prisma.card.findUnique({ where: { id }, select: { id: true } });
     if (!existente) return { erros: {}, mensagem: "Esse card não existe mais." };
@@ -94,7 +136,7 @@ export async function salvarCard(
     // Card novo entra como nunca estudado: `introducedAt` fica null, e é o
     // lote que decide quando ele aparece pela primeira vez.
     const inicial = newCardState(Date.now());
-    await prisma.card.create({
+    const criado = await prisma.card.create({
       data: {
         ...campos,
         ease: inicial.ease,
@@ -104,12 +146,26 @@ export async function salvarCard(
         dueAt: new Date(inicial.dueAt),
         lapses: inicial.lapses,
       },
+      select: { id: true },
     });
+    salvoId = criado.id;
   }
 
   revalidatePath("/");
   revalidatePath("/cards");
   revalidatePath("/imagens");
+
+  if (lerContexto(form) === "modal") {
+    return {
+      erros: {},
+      salvo: {
+        id: id || salvoId,
+        front: dados.front,
+        reading: dados.reading,
+        meaning: dados.meaning,
+      },
+    };
+  }
   redirect(`/cards?deck=${encodeURIComponent(dados.deckId)}&salvo=1`);
 }
 
@@ -118,24 +174,24 @@ export async function salvarCard(
  *
  * O `onDelete: Cascade` do schema apaga as revisões junto. É o comportamento
  * certo (histórico de card inexistente não significa nada), mas é perda de
- * dado real, e por isso a tela pede confirmação antes de chamar isto.
+ * dado real, e por isso o modal pede confirmação antes de chamar isto.
+ *
+ * Não redireciona: quem chama está num modal sobre a lista ou sobre uma
+ * sessão de estudo, e navegar levaria a fila junto.
  */
 export async function excluirCard(form: FormData): Promise<void> {
   const id = String(form.get("id") ?? "").trim();
   if (!id) throw new Error("card não informado");
 
-  const card = await prisma.card.findUnique({
-    where: { id },
-    select: { deckId: true },
-  });
-  if (!card) redirect("/cards");
+  // Já excluído por outra aba: não é erro, o resultado pedido é o que já vale.
+  const card = await prisma.card.findUnique({ where: { id }, select: { id: true } });
+  if (!card) return;
 
   await prisma.card.delete({ where: { id } });
 
   revalidatePath("/");
   revalidatePath("/cards");
   revalidatePath("/imagens");
-  redirect(`/cards?deck=${encodeURIComponent(card.deckId)}&excluido=1`);
 }
 
 /**
@@ -156,5 +212,4 @@ export async function limparImagem(form: FormData): Promise<void> {
 
   revalidatePath("/cards");
   revalidatePath("/imagens");
-  redirect(`/cards/editar?id=${encodeURIComponent(id)}&imagem=limpa`);
 }

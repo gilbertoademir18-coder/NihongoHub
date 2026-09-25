@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { CardSalvo } from "@/lib/card-form";
 import type { CardEstudo } from "@/lib/server/study";
 import { type Rating, formatDelay, previewIntervals } from "@/lib/srs";
 import { useSessaoEstudo } from "@/lib/use-sessao-estudo";
 import { ImagemDoCard } from "./imagem-do-card";
+import { ModalEditarCard } from "./modal-editar-card";
 import { SessionDone } from "./session-done";
 
 /**
@@ -61,8 +63,19 @@ export function StudySession({
 }) {
   const sessao = useSessaoEstudo(filaInicial, { treino });
   const [revelado, setRevelado] = useState(false);
+  /** Card aberto no modal de edição; `null` com o modal fechado. */
+  const [editando, setEditando] = useState<string | null>(null);
+  /**
+   * O que a edição mudou, por id de card.
+   *
+   * A fila vive na memória e o modal grava no banco: sem isto a tela mostraria
+   * o texto antigo do card recém-corrigido, e recarregar para vê-lo custaria a
+   * sessão inteira.
+   */
+  const [editados, setEditados] = useState<Record<string, CardSalvo>>({});
 
-  const { atual, fila, revisados, salvando, erro, responder } = sessao;
+  const { atual: cru, fila, revisados, salvando, erro, responder } = sessao;
+  const atual = cru && editados[cru.id] ? { ...cru, ...editados[cru.id] } : cru;
 
   async function avaliar(rating: Rating) {
     const gravou = await responder(rating, { modo: "flashcard" });
@@ -158,6 +171,17 @@ export function StudySession({
                 )}
               </div>
             )}
+
+            {/* Mesmo atalho do modo digitação: é ao ver a resposta que se
+                percebe o erro, e consertar na hora evita terminar a sessão
+                com uma lista de coisas a arrumar depois. */}
+            <button
+              type="button"
+              onClick={() => setEditando(atual.id)}
+              className="text-xs text-muted underline-offset-2 hover:text-accent hover:underline"
+            >
+              Editar este card
+            </button>
           </div>
         )}
       </article>
@@ -203,6 +227,12 @@ export function StudySession({
           </span>
         </button>
       )}
+
+      <ModalEditarCard
+        cardId={editando}
+        aoFechar={() => setEditando(null)}
+        aoSalvar={(salvo) => setEditados((atual) => ({ ...atual, [salvo.id]: salvo }))}
+      />
     </div>
   );
 }

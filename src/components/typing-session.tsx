@@ -9,10 +9,12 @@ import {
   kanaParcial,
   verificarResposta,
 } from "@/lib/romaji";
+import type { CardSalvo } from "@/lib/card-form";
 import type { CardEstudo } from "@/lib/server/study";
 import type { Rating } from "@/lib/srs";
 import { useSessaoEstudo } from "@/lib/use-sessao-estudo";
 import { ImagemDoCard } from "./imagem-do-card";
+import { ModalEditarCard } from "./modal-editar-card";
 import { SessionDone } from "./session-done";
 
 /**
@@ -65,8 +67,20 @@ export function TypingSession({
   const [congelado, setCongelado] = useState<CardEstudo | null>(null);
   /** Cada avanço começa uma rodada nova — e é a chave que zera o formulário. */
   const [rodada, setRodada] = useState(0);
+  /** Card aberto no modal de edição; `null` com o modal fechado. */
+  const [editando, setEditando] = useState<string | null>(null);
+  /**
+   * O que a edição mudou, por id de card.
+   *
+   * A fila vive na memória, e o modal grava no banco — sem isto a tela
+   * continuaria mostrando o texto antigo do card que você acabou de corrigir,
+   * e a única saída seria recarregar, que é perder a sessão.
+   */
+  const [editados, setEditados] = useState<Record<string, CardSalvo>>({});
 
-  const card = congelado ?? atual;
+  const base = congelado ?? atual;
+  const edicao = base ? editados[base.id] : undefined;
+  const card = base && edicao ? { ...base, ...edicao } : base;
 
   if (!card) {
     return (
@@ -113,6 +127,13 @@ export function TypingSession({
           setCongelado(null);
           setRodada((n) => n + 1);
         }}
+        aoEditar={() => setEditando(card.id)}
+      />
+
+      <ModalEditarCard
+        cardId={editando}
+        aoFechar={() => setEditando(null)}
+        aoSalvar={(salvo) => setEditados((atual) => ({ ...atual, [salvo.id]: salvo }))}
       />
     </div>
   );
@@ -124,12 +145,14 @@ function Rodada({
   erro,
   aoResponder,
   aoAvancar,
+  aoEditar,
 }: {
   card: CardEstudo;
   salvando: boolean;
   erro: string | null;
   aoResponder: (rating: Rating, detalhes: DetalhesRevisao) => Promise<boolean>;
   aoAvancar: () => void;
+  aoEditar: () => void;
 }) {
   const [texto, setTexto] = useState("");
   const [fase, setFase] = useState<Fase>("digitando");
@@ -258,6 +281,19 @@ function Rodada({
                 Escreva a palavra para continuar
               </p>
             )}
+
+            {/* Só depois de responder: o momento em que se percebe que a
+                leitura está errada é justamente o de ver a resposta, e
+                consertar ali evita terminar a sessão com uma anotação do que
+                arrumar depois. Abre em modal porque sair da página levaria a
+                fila junto. */}
+            <button
+              type="button"
+              onClick={aoEditar}
+              className="mt-2 text-xs text-muted underline-offset-2 hover:text-accent hover:underline"
+            >
+              Editar este card
+            </button>
           </div>
         )}
       </article>

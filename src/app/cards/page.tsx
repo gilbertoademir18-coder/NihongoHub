@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { ListaDeCards } from "@/components/lista-de-cards";
 import { listarCards, listarDecksSimples } from "@/lib/server/cards";
 
 /**
@@ -98,39 +98,7 @@ export default async function CardsPage({
           {busca ? "Nada encontrado." : "Nenhum card ainda."}
         </p>
       ) : (
-        <ul className="space-y-2">
-          {cards.map((card) => (
-            <li key={card.id}>
-              <Link
-                href={`/cards/editar?id=${encodeURIComponent(card.id)}`}
-                className="flex items-center gap-3 rounded-lg border border-border bg-surface p-3 transition-colors hover:border-accent"
-              >
-                <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-surface-muted">
-                  {card.imagePath && (
-                    <Image
-                      src={card.imagePath}
-                      alt=""
-                      fill
-                      sizes="3rem"
-                      className="object-cover"
-                    />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="jp truncate text-lg leading-tight">{card.front}</p>
-                  <p className="truncate text-sm text-muted">
-                    <span className="jp">{card.reading}</span> · {card.meaning}
-                  </p>
-                </div>
-                {card.novo && (
-                  <span className="shrink-0 rounded-full bg-surface-muted px-2 py-0.5 text-[11px] text-muted">
-                    novo
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ListaDeCards cards={cards} />
       )}
     </div>
   );
