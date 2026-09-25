@@ -221,9 +221,6 @@ function Rodada({
       <article className="rounded-xl border border-border bg-surface">
         <div className="flex min-h-40 flex-col items-center justify-center gap-2 p-8 text-center">
           <p className="jp text-6xl font-medium leading-tight">{card.front}</p>
-          {mostrandoResposta && (
-            <p className="mt-2 text-base font-medium">{card.meaning}</p>
-          )}
         </div>
 
         {mostrandoResposta && (
@@ -232,15 +229,23 @@ function Rodada({
               acertou ? "border-success/40 bg-success/10" : "border-accent/30 bg-accent-soft"
             }`}
           >
+            {/* No acerto o próprio verde já diz que deu certo; escrever
+                "Certo" ao lado seria repetir a informação. O erro precisa da
+                frase, porque o kana ali embaixo não é o que foi digitado. */}
+            {!acertou && (
+              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+                A resposta era
+              </p>
+            )}
+            <p className={`jp text-2xl ${acertou ? "" : "mt-1"}`}>{card.reading}</p>
+            <p className="mt-0.5 text-sm text-muted">{romajiEsperado}</p>
             <p
-              className={`text-xs font-semibold uppercase tracking-wide ${
-                acertou ? "text-success" : "text-accent"
+              className={`mt-1 font-medium ${
+                acertou ? "text-success" : "text-foreground"
               }`}
             >
-              {acertou ? "Certo" : "A resposta era"}
+              {card.meaning}
             </p>
-            <p className="jp mt-1 text-2xl">{card.reading}</p>
-            <p className="mt-0.5 text-sm text-muted">{romajiEsperado}</p>
             {fase === "corrigindo" && (
               <p className="mt-2 text-xs text-muted">
                 Escreva a palavra para continuar
