@@ -70,6 +70,20 @@ model Card {
   /// Silabário da palavra, para filtrar a sessão. `null` nos cards com kanji.
   script         Script?
 
+  // Imagem ilustrativa. Quatro colunas em vez de um JSON porque três delas são
+  // lidas na montagem da fila e a quarta decide o que ainda falta buscar.
+  //
+  /// Termo de busca da imagem. `null` diz "esta palavra não tem imagem" — e é
+  /// uma decisão, não uma pendência: `ぜんぶ` (tudo) ou `どこ` (onde) não têm
+  /// foto possível, e inventar uma ensinaria a associação errada.
+  imageQuery  String? @map("image_query")
+  /// Caminho da imagem baixada, relativo a `public/`. `null` = ainda não buscada.
+  imagePath   String? @map("image_path")
+  /// Autor e licença. As licenças CC exigem atribuição; sem isto o uso é irregular.
+  imageCredit String? @map("image_credit")
+  /// Página de origem, para conferir a procedência da imagem.
+  imageSource String? @map("image_source")
+
   // Estado do SRS, achatado em colunas em vez de um JSON: só assim o
   // vencimento entra em índice, e a fila do dia vira uma varredura de range.
   /// Fator de facilidade do SM-2.

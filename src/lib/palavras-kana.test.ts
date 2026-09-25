@@ -133,3 +133,55 @@ describe("ordem pedagógica", () => {
     }
   });
 });
+
+describe("termos de busca de imagem", () => {
+  /** Tem ao menos um caractere japonês — kana ou kanji. */
+  function ehJapones(termo: string) {
+    return /[぀-ヿ一-鿿]/.test(termo);
+  }
+
+  it("termo só em kana nunca é curto o bastante para colidir como substring", () => {
+    // Japonês não separa palavras, então a conferência do script só consegue
+    // casar por substring — e substring curto casa dentro de outra palavra.
+    // Medido: `たたみ` (tatami) trouxe 折りたたみ自転車, uma bicicleta dobrável,
+    // e `あお` (azul) trouxe fotos da atriz Miyazaki あおい.
+    //
+    // O piso vale só para kana, que é escrita fonética e por isso colide: dois
+    // kanji já formam uma palavra específica (`紅葉` é folhagem de outono e
+    // nada mais), e exigir três deles proibiria termos bons.
+    const soKana = (x: string) => /^[぀-ヿ]+$/.test(x);
+    for (const p of PALAVRAS_KANA) {
+      if (!p.busca || !ehJapones(p.busca)) continue;
+      for (const pedaco of p.busca.split(/\s+/)) {
+        if (!soKana(pedaco)) continue;
+        expect(
+          pedaco.length,
+          `${p.palavra}: "${pedaco}" é kana curto demais para buscar`,
+        ).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it("termo em alfabeto latino nunca é uma palavra só de duas letras", () => {
+    // Mesma armadilha do outro lado: a conferência exige palavra inteira, mas
+    // um termo minúsculo casa com qualquer coisa e não identifica nada.
+    for (const p of PALAVRAS_KANA) {
+      if (!p.busca || ehJapones(p.busca)) continue;
+      expect(p.busca.trim().length, `${p.palavra}: termo "${p.busca}" curto demais`)
+        .toBeGreaterThan(2);
+    }
+  });
+
+  it("toda palavra sem termo é sem imagem por decisão, não por esquecimento", () => {
+    // A lista é explícita de propósito: acrescentar uma palavra nova sem
+    // termo quebra este teste, obrigando a decidir se ela tem imagem ou não.
+    const SEM_IMAGEM = new Set([
+      "あい", "うえ", "きく", "こえ", "これ", "ろく", "わたし", "れきし", "るす",
+      "げんき", "じかん", "ぜんぶ", "どこ", "ちぢむ", "つづく", "いっぱい",
+      "ぺらぺら", "きょう", "びょうき", "ガス", "キロ", "ゼロ", "モデル",
+      "ルール", "ユーモア", "ツアー",
+    ]);
+    const semTermo = PALAVRAS_KANA.filter((p) => !p.busca).map((p) => p.palavra);
+    expect(new Set(semTermo)).toEqual(SEM_IMAGEM);
+  });
+});

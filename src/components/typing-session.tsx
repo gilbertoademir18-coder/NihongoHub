@@ -12,6 +12,7 @@ import {
 import type { CardEstudo } from "@/lib/server/study";
 import type { Rating } from "@/lib/srs";
 import { useSessaoEstudo } from "@/lib/use-sessao-estudo";
+import { ImagemDoCard } from "./imagem-do-card";
 import { SessionDone } from "./session-done";
 
 /**
@@ -229,6 +230,17 @@ function Rodada({
               acertou ? "border-success/40 bg-success/10" : "border-accent/30 bg-accent-soft"
             }`}
           >
+            {/* A imagem entra aqui, e não junto da palavra: ver a foto antes
+                de responder entregaria o significado, e o exercício deixaria
+                de ser ler o kana para virar reconhecer o desenho. Depois da
+                resposta ela só reforça o que já foi decidido. */}
+            {card.imagePath && (
+              <ImagemDoCard
+                src={card.imagePath}
+                alt={card.meaning}
+                credito={card.imageCredit}
+              />
+            )}
             {/* Sem rótulo: a cor do bloco já diz se acertou ou errou, e o
                 campo de digitação fica vazio depois do erro — não há o que
                 confundir com a resposta certa. */}

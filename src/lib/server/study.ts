@@ -31,6 +31,10 @@ export interface CardEstudo {
   meaning: string;
   example: string | null;
   exampleMeaning: string | null;
+  /** Caminho da imagem em `public/`, ou `null` para card sem imagem. */
+  imagePath: string | null;
+  /** Autor e licença, que as licenças CC exigem exibir. */
+  imageCredit: string | null;
   srs: SrsState;
 }
 
@@ -43,6 +47,8 @@ const SELECAO_CARD = {
   meaning: true,
   example: true,
   exampleMeaning: true,
+  imagePath: true,
+  imageCredit: true,
   ease: true,
   intervalDays: true,
   repetitions: true,
@@ -56,7 +62,7 @@ type LinhaCard = {
     ? Date
     : K extends "learningStep"
       ? number | null
-      : K extends "example" | "exampleMeaning"
+      : K extends "example" | "exampleMeaning" | "imagePath" | "imageCredit"
         ? string | null
         : K extends "id" | "deckId" | "front" | "reading" | "meaning"
           ? string
@@ -78,6 +84,8 @@ export function paraCardEstudo(linha: LinhaCard): CardEstudo {
     meaning: linha.meaning,
     example: linha.example,
     exampleMeaning: linha.exampleMeaning,
+    imagePath: linha.imagePath,
+    imageCredit: linha.imageCredit,
     srs: {
       ease: linha.ease,
       intervalDays: linha.intervalDays,
@@ -337,4 +345,50 @@ export async function buscarFila(
     vencidos.map(paraCardEstudo),
     novos.map(paraCardEstudo),
   );
+}
+
+export interface CardComImagem {
+  id: string;
+  front: string;
+  meaning: string;
+  deckName: string;
+  imageQuery: string | null;
+  imagePath: string | null;
+  imageCredit: string | null;
+  imageSource: string | null;
+}
+
+/**
+ * Todos os cards, para a tela de revisão das imagens.
+ *
+ * A escolha automática acerta a maioria e erra o resto de formas que só o olho
+ * pega: procurando "ribbon" veio uma cachoeira chamada Ribbon Falls, e
+ * procurando "milk glass" veio um saleiro — os dois com o termo no título.
+ * Nenhuma heurística resolve isso; ver as 150 de uma vez, sim.
+ */
+export async function listarImagens(): Promise<CardComImagem[]> {
+  const cards = await prisma.card.findMany({
+    select: {
+      id: true,
+      front: true,
+      meaning: true,
+      imageQuery: true,
+      imagePath: true,
+      imageCredit: true,
+      imageSource: true,
+      deck: { select: { name: true } },
+    },
+    orderBy: [{ deck: { createdAt: "asc" } }, { createdAt: "asc" }],
+  });
+
+  return cards.map((c) => ({
+    id: c.id,
+    front: c.front,
+    meaning: c.meaning,
+    deckName: c.deck.name,
+    imageQuery: c.imageQuery,
+    imagePath: c.imagePath,
+    imageCredit: c.imageCredit,
+    imageSource: c.imageSource,
+  }));
 }

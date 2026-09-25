@@ -28,6 +28,8 @@ interface CardParaSemear {
   exampleMeaning?: string;
   tags?: string[];
   script?: "hiragana" | "katakana";
+  /** Termo de busca da imagem; ausente = card sem imagem por decisão. */
+  busca?: string;
 }
 
 interface DeckParaSemear {
@@ -62,6 +64,7 @@ const DECK_KANA: DeckParaSemear = {
     meaning: palavra.meaning,
     tags: palavra.expressao ? ["expressão"] : [],
     script: palavra.script,
+    busca: palavra.busca,
   })),
 };
 
@@ -101,6 +104,7 @@ async function main() {
             exampleMeaning: card.exampleMeaning,
             tags: card.tags ?? [],
             script: card.script,
+            imageQuery: card.busca,
             // Mesmo truque, agora por card: é o `createdAt` que define a ordem
             // de introdução das palavras, e ela é pedagógica — as primeiras
             // usam os kana mais simples.
@@ -122,6 +126,48 @@ async function main() {
   }
 
   if (criados === 0) console.log("nada novo a semear");
+
+  await sincronizarTermosDeBusca();
+}
+
+/**
+ * Propaga os termos de busca de imagem para os cards que já existem.
+ *
+ * A curadoria mora no código, mas os decks só são criados uma vez — sem este
+ * passo, ajustar um termo não chegaria a nenhum banco já semeado, e a única
+ * saída seria apagar tudo e semear de novo, levando junto todo o histórico de
+ * estudo.
+ *
+ * Mexe **apenas** em `imageQuery`. O estado do SRS não é tocado: reexecutar o
+ * seed não pode custar o progresso de ninguém.
+ */
+async function sincronizarTermosDeBusca() {
+  const porFrente = new Map<string, string | null>();
+  for (const deck of TODOS_OS_DECKS) {
+    for (const card of deck.cards) porFrente.set(card.front, card.busca ?? null);
+  }
+
+  const cards = await prisma.card.findMany({
+    select: { id: true, front: true, imageQuery: true },
+  });
+
+  let ajustados = 0;
+  for (const card of cards) {
+    if (!porFrente.has(card.front)) continue;
+    const desejado = porFrente.get(card.front) ?? null;
+    if (card.imageQuery === desejado) continue;
+    await prisma.card.update({
+      where: { id: card.id },
+      data: { imageQuery: desejado },
+    });
+    ajustados += 1;
+  }
+
+  console.log(
+    ajustados > 0
+      ? `· termos de busca de imagem: ${ajustados} card(s) atualizados`
+      : "· termos de busca de imagem: já em dia",
+  );
 }
 
 main()

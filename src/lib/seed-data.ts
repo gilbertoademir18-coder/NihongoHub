@@ -14,11 +14,14 @@ export interface SeedCard {
   example?: string;
   exampleMeaning?: string;
   tags?: string[];
+  /** Termo de busca da imagem; ausente = card sem imagem. Ver `PalavraKana.busca`. */
+  busca?: string;
 }
 
 const KANJI_N5: SeedCard[] = [
   {
     front: "日",
+    busca: "sun in the sky",
     reading: "にち・ひ",
     meaning: "dia, sol",
     example: "今日はいい天気です。",
@@ -26,6 +29,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "本",
+    busca: "open book pages",
     reading: "ほん",
     meaning: "livro, origem",
     example: "この本は面白いです。",
@@ -33,6 +37,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "人",
+    busca: "person",
     reading: "ひと・じん",
     meaning: "pessoa",
     example: "あの人は先生です。",
@@ -40,6 +45,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "水",
+    busca: "water",
     reading: "みず",
     meaning: "água",
     example: "水を飲みます。",
@@ -47,6 +53,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "火",
+    busca: "campfire burning",
     reading: "ひ・か",
     meaning: "fogo",
     example: "火に気をつけてください。",
@@ -54,6 +61,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "木",
+    busca: "tree",
     reading: "き・もく",
     meaning: "árvore, madeira",
     example: "公園に木がたくさんあります。",
@@ -61,6 +69,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "金",
+    busca: "gold coins",
     reading: "かね・きん",
     meaning: "dinheiro, ouro",
     example: "お金がありません。",
@@ -68,6 +77,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "山",
+    busca: "mountain",
     reading: "やま・さん",
     meaning: "montanha",
     example: "山が高いです。",
@@ -75,6 +85,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "川",
+    busca: "river",
     reading: "かわ",
     meaning: "rio",
     example: "川で泳ぎます。",
@@ -117,6 +128,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "手",
+    busca: "hand fingers palm",
     reading: "て・しゅ",
     meaning: "mão",
     example: "手を洗います。",
@@ -124,6 +136,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "目",
+    busca: "human eye",
     reading: "め・もく",
     meaning: "olho",
     example: "目が痛いです。",
@@ -131,6 +144,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "口",
+    busca: "mouth",
     reading: "くち・こう",
     meaning: "boca",
     example: "口を開けてください。",
@@ -138,6 +152,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "男",
+    busca: "man portrait",
     reading: "おとこ・だん",
     meaning: "homem",
     example: "男の子が三人います。",
@@ -145,6 +160,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "女",
+    busca: "woman portrait",
     reading: "おんな・じょ",
     meaning: "mulher",
     example: "女の人が来ました。",
@@ -152,6 +168,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "子",
+    busca: "child",
     reading: "こ・し",
     meaning: "criança, filho",
     example: "子どもが好きです。",
@@ -159,6 +176,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "先生",
+    busca: "日本 先生 教室",
     reading: "せんせい",
     meaning: "professor, mestre",
     example: "先生に聞きます。",
@@ -167,6 +185,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "学生",
+    busca: "students in classroom",
     reading: "がくせい",
     meaning: "estudante",
     example: "私は学生です。",
@@ -175,6 +194,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "学校",
+    busca: "日本 小学校",
     reading: "がっこう",
     meaning: "escola",
     example: "学校へ行きます。",
@@ -190,6 +210,7 @@ const KANJI_N5: SeedCard[] = [
   },
   {
     front: "年",
+    busca: "calendar year",
     reading: "とし・ねん",
     meaning: "ano",
     example: "来年日本へ行きます。",

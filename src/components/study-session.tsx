@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { CardEstudo } from "@/lib/server/study";
 import { type Rating, formatDelay, previewIntervals } from "@/lib/srs";
 import { useSessaoEstudo } from "@/lib/use-sessao-estudo";
+import { ImagemDoCard } from "./imagem-do-card";
 import { SessionDone } from "./session-done";
 
 /**
@@ -138,6 +139,16 @@ export function StudySession({
 
         {revelado && (
           <div className="space-y-3 border-t border-border p-5 text-center">
+            {/* Do lado da resposta, como no modo digitação: a imagem reforça o
+                significado depois que você já se comprometeu com um palpite —
+                vê-la antes tornaria a auto-avaliação uma ficção. */}
+            {atual.imagePath && (
+              <ImagemDoCard
+                src={atual.imagePath}
+                alt={atual.meaning}
+                credito={atual.imageCredit}
+              />
+            )}
             <p className="text-lg font-medium">{atual.meaning}</p>
             {atual.example && (
               <div className="rounded-lg bg-surface-muted p-3">

@@ -132,6 +132,7 @@ depois do filho, o que não é parentesco e sim um PID reciclado pelo Windows.
 | `npm run db:seed` | Carrega os decks de exemplo (idempotente) |
 | `npm run db:studio` | Abre o Prisma Studio para navegar nos dados |
 | `npm run icons` | Regenera os ícones do PWA em `public/` |
+| `npm run imagens` | Baixa as imagens dos cards que ainda não têm |
 
 ## Banco de dados
 
@@ -188,6 +189,7 @@ prisma/
   seed.ts           Popula os decks iniciais.
 scripts/
   tray.ps1             Ícone da bandeja: sobe, reinicia e encerra o servidor.
+  buscar-imagens.ts    Baixa do Openverse a imagem de cada card.
   diagnostico-fuso.ts  Verifica a coerência de fuso entre Node e Postgres.
 ```
 
@@ -297,6 +299,70 @@ declaradas com motivo em `src/lib/kana.ts`: `を` só existe como partícula
 | (nenhuma) | A conferência é automática, a cada tecla | Digitar |
 | `enter` | Ir para a próxima palavra | Digitar |
 | `enter` | Confirmar antes de completar a palavra | Digitar |
+
+## Imagens nos cards
+
+Cada card pode ter uma imagem, e ela aparece **só no lado da resposta**. Ver a
+foto junto do japonês entregaria o significado, e o exercício deixaria de ser
+ler o kana para virar reconhecer o desenho.
+
+A fonte é o [Openverse](https://openverse.org), catálogo de licença aberta: não
+pede chave de API e devolve autor e licença junto do resultado, que é o que
+permite creditar direito — e o crédito aparece sob a imagem porque quase toda
+licença Creative Commons exige atribuição.
+
+```bash
+npm run imagens          # baixa o que falta; roda quantas vezes precisar
+```
+
+### Buscar em japonês funciona — mas só para certas palavras
+
+A ideia era buscar pelo texto em japonês, e ela está certa onde importa:
+`ごはん` devolve uma tigela de arroz e `日本 駅` devolve uma estação japonesa,
+enquanto "rice" e "train station" devolveriam um saco de grãos e a Grand
+Central. Medido, palavras japonesas distintivas acertam 5 em 7.
+
+Palavras de duas moras, não. Kana é escrita fonética, e duas moras colidem com
+tudo:
+
+| Busca | O que veio |
+| --- | --- |
+| `あお` (azul) | fotos da atriz Miyazaki **あおい** |
+| `うえ` (em cima) | o parque de **うえ**の, um macaco, um shinkansen |
+| `いけ` (lago) | uma ilustradora chamada **いけ** |
+| `たたみ` (tatami) | 折り**たたみ**自転車 — bicicleta dobrável |
+
+Trocar de fonte não resolve, porque o problema é a consulta: a Wikipédia
+japonesa cai em páginas de desambiguação sem imagem, e o Wikidata acertou 2 de
+20. Acrescentar o kanji piora — `上` e `愛` casam com nomes próprios chineses
+(黃上晏, 邱愛晨).
+
+Por isso o termo de busca é **dado curado**, em `busca` (veja
+`src/lib/palavras-kana.ts`): japonês onde a imagem japonesa é a representação
+certa, inglês onde o kana é ambíguo demais. E **ausente é uma decisão**: `ぜんぶ`
+(tudo), `どこ` (onde) e `つづく` (continuar) não têm imagem possível, e inventar
+uma ensinaria a associação errada — que num SRS é o pior defeito de todos,
+porque a repetição a fixa.
+
+### A escolha automática precisa de olho humano
+
+O script pontua os candidatos exigindo **palavra inteira** no título, o que
+derruba as colisões por substring: sem isso, "person" trazia um *Sharp X68000
+**Person**al Computer*. Mas nenhuma pontuação de texto pega o resto — estes
+passaram com o termo no título e ainda assim estavam errados:
+
+| Busca | O que veio |
+| --- | --- |
+| `ribbon` (fita) | **Ribbon** Falls, uma cachoeira |
+| `milk glass` (leite) | **Milk Glass** Salt Shakers — um tipo de vidro |
+| `elevator` | Space **Elevator**, arte de ficção científica |
+| `fire flame` (fogo) | botas com chamas pintadas |
+| `cat` (gato) | **Cat** Fish — um bagre |
+
+A tela **`/imagens`** existe para esse julgamento: mostra as ~150 de uma vez com
+o termo que as trouxe. Achou uma errada, ajuste o `busca`, rode `npm run
+db:seed` (que propaga a curadoria para o banco sem tocar no seu progresso),
+limpe o `image_path` do card e rode `npm run imagens` de novo.
 
 ## Notas
 

@@ -14,7 +14,8 @@
     "db:seed": "tsx --env-file=.env prisma/seed.ts",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "imagens": "tsx --env-file=.env scripts/buscar-imagens.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
