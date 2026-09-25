@@ -229,15 +229,10 @@ function Rodada({
               acertou ? "border-success/40 bg-success/10" : "border-accent/30 bg-accent-soft"
             }`}
           >
-            {/* No acerto o próprio verde já diz que deu certo; escrever
-                "Certo" ao lado seria repetir a informação. O erro precisa da
-                frase, porque o kana ali embaixo não é o que foi digitado. */}
-            {!acertou && (
-              <p className="text-xs font-semibold uppercase tracking-wide text-accent">
-                A resposta era
-              </p>
-            )}
-            <p className={`jp text-2xl ${acertou ? "" : "mt-1"}`}>{card.reading}</p>
+            {/* Sem rótulo: a cor do bloco já diz se acertou ou errou, e o
+                campo de digitação fica vazio depois do erro — não há o que
+                confundir com a resposta certa. */}
+            <p className="jp text-2xl">{card.reading}</p>
             <p className="mt-0.5 text-sm text-muted">{romajiEsperado}</p>
             <p
               className={`mt-1 font-medium ${
