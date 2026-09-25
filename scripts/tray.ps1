@@ -261,6 +261,31 @@ function Abrir-Navegador {
     Start-Process $URL
 }
 
+$WORKSPACE = Join-Path $RAIZ "NihongoHub.code-workspace"
+
+<#
+    Onde está o VS Code, ou $null.
+
+    Chamar o `code` do PATH seria mais curto, mas ele é um `.cmd`: abriria um
+    console por um instante a cada clique, que é exatamente o que este ícone
+    existe para não fazer. O executável de verdade não abre nada.
+
+    Abrir o `.code-workspace` pela associação de arquivo também não serve —
+    numa instalação limpa do VS Code essa extensão não fica associada a nada,
+    e o clique viraria a caixa "como você quer abrir este arquivo?".
+#>
+function Achar-VsCode {
+    $candidatos = @(
+        (Join-Path $env:LOCALAPPDATA        "Programs\Microsoft VS Code\Code.exe"),
+        (Join-Path $env:ProgramFiles        "Microsoft VS Code\Code.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Microsoft VS Code\Code.exe"),
+        (Join-Path $env:LOCALAPPDATA        "Programs\Microsoft VS Code Insiders\Code - Insiders.exe"),
+        (Join-Path $env:ProgramFiles        "Microsoft VS Code Insiders\Code - Insiders.exe")
+    )
+    foreach ($c in $candidatos) { if (Test-Path $c) { return $c } }
+    return $null
+}
+
 # ---------------------------------------------------------------------------
 # Início automático
 # ---------------------------------------------------------------------------
@@ -333,6 +358,7 @@ $bandeja.ContextMenuStrip = $menu
 
 $itemAbrir = $menu.Items.Add("Abrir no Edge")
 $itemAbrir.Font = New-Object System.Drawing.Font($menu.Font, [System.Drawing.FontStyle]::Bold)
+$itemCode = $menu.Items.Add("Abrir no VS Code")
 $itemReiniciar = $menu.Items.Add("Reiniciar o servidor")
 $menu.Items.Add("-") | Out-Null
 $itemStartup = $menu.Items.Add("Iniciar com o Windows")
@@ -390,6 +416,18 @@ $itemAbrir.add_Click({
 
 $bandeja.add_DoubleClick({ $itemAbrir.PerformClick() })
 
+$itemCode.add_Click({
+    $code = Achar-VsCode
+    if (-not $code) {
+        Avisar "Não encontrei o VS Code instalado nesta máquina." "Error"
+        return
+    }
+    # Sem o arquivo de workspace, abre a pasta: o VS Code aceita as duas
+    # coisas, e a pasta é o que se queria de qualquer jeito.
+    $alvo = if (Test-Path $WORKSPACE) { $WORKSPACE } else { $RAIZ }
+    Start-Process $code -ArgumentList "`"$alvo`""
+})
+
 $itemReiniciar.add_Click({
     Avisar "Reiniciando o servidor..." "Info"
     Parar-Servidor
@@ -415,9 +453,13 @@ $itemStartup.add_Click({
     }
 })
 
-# A pasta Inicializar pode mudar por fora — vale reler a cada abertura do menu
-# em vez de confiar no que era verdade quando o ícone subiu.
-$menu.add_Opening({ $itemStartup.Checked = Inicio-Automatico-Ligado })
+# A pasta Inicializar e a instalação do VS Code podem mudar por fora — vale
+# reler a cada abertura do menu, em vez de confiar no que era verdade quando o
+# ícone subiu. Assim instalar o VS Code depois não exige reiniciar o ícone.
+$menu.add_Opening({
+    $itemStartup.Checked = Inicio-Automatico-Ligado
+    $itemCode.Enabled = [bool](Achar-VsCode)
+})
 
 $itemLog.add_Click({
     if (Test-Path $LOG) { Start-Process notepad.exe -ArgumentList $LOG }

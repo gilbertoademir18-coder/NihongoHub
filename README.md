@@ -54,6 +54,7 @@ bandeja. Não há dependência nova: o WinForms já vem com o Windows.
 | Item do menu | O que faz |
 | --- | --- |
 | **Abrir no Edge** | Abre o app; com o servidor parado, sobe ele antes |
+| Abrir no VS Code | Abre `NihongoHub.code-workspace` — ou a pasta, se ele não existir |
 | Reiniciar o servidor | Derruba e sobe de novo — útil ao mexer em `.env` ou no schema |
 | Iniciar com o Windows | Liga e desliga a subida automática no login |
 | Ver o log | Abre a saída do servidor no Bloco de Notas |
@@ -62,6 +63,14 @@ bandeja. Não há dependência nova: o WinForms já vem com o Windows.
 O ícone fica **cinza enquanto o servidor sobe** e volta a cor quando a porta
 atende: de relance, perto do relógio, isso responde "dá para estudar agora?"
 sem precisar parar o mouse em cima.
+
+O item do VS Code procura o `Code.exe` nos caminhos de instalação conhecidos, e
+fica **desabilitado** se não achar nenhum — a busca refaz a cada abertura do
+menu, então instalar o VS Code depois não exige reiniciar o ícone. Dois
+caminhos mais curtos foram descartados: o `code` do PATH é um `.cmd` e abriria
+um console a cada clique, e a extensão `.code-workspace` não fica associada a
+nada numa instalação limpa, o que transformaria o clique na caixa "como você
+quer abrir este arquivo?".
 
 ### `-WindowStyle Hidden` não esconde mais nada
 
