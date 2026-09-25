@@ -7,7 +7,11 @@ com PostgreSQL.
 
 No Windows, **dê um duplo clique em `abrir.cmd`**. Ele instala as dependências
 na primeira vez, sobe o servidor e abre o Microsoft Edge sozinho quando
-estiver pronto. Para parar, feche a janela.
+estiver pronto.
+
+O servidor não fica numa janela: ele vira um **ícone na bandeja**, perto do
+relógio. Clique com o botão direito para abrir o app, reiniciar o servidor,
+ver o log ou sair — e é o "Sair" que encerra tudo.
 
 Ou pela linha de comando:
 
@@ -21,17 +25,62 @@ npm run dev          # http://localhost:3100
 ### Por que a porta 3100
 
 A 3000 é o padrão do Next e a mais disputada em máquina de desenvolvimento —
-aqui ela já pertence a outro projeto. O `abrir.cmd` não se contenta em ver a
-porta responder: ele confere se **quem respondeu é o NihongoHub**. Sem isso,
-outro app atendendo ali faria o script anunciar "já está rodando" e abrir o
-navegador no lugar errado.
+aqui ela já pertence a outro projeto. O ícone da bandeja não se contenta em ver
+a porta responder: ele confere se **quem respondeu é o NihongoHub**. Sem isso,
+outro app atendendo ali faria o ícone anunciar "no ar" e abrir o navegador no
+lugar errado.
+
+Essa conferência espera até 30 segundos de propósito. Em desenvolvimento a
+primeira resposta aguarda o Turbopack compilar a home — medido em 3s — e um
+limite curto acusaria "porta ocupada por outro programa" logo depois de o
+servidor subir, que é o pior momento possível para um alarme falso. Quem de
+fato for outro programa responde na hora, com o conteúdo errado.
 
 Para mudar a porta, os dois lugares são `package.json` (scripts `dev` e
-`start`) e o `abrir.cmd`.
+`start`) e `scripts/tray.ps1`.
+
+## O ícone da bandeja
+
+Um servidor de desenvolvimento precisa ficar vivo enquanto se estuda, mas isso
+não obriga ninguém a manter um prompt aberto no meio da tela — e uma janela que
+não pode ser fechada é uma janela que uma hora será fechada por engano.
+
+O `abrir.cmd` só cuida do que pode falhar antes de existir ícone para avisar
+(Node ausente, dependências faltando) e entrega o resto a `scripts/tray.ps1`,
+que sobe o `next dev` como processo oculto e fica na bandeja. Não há
+dependência nova: o WinForms já vem com o Windows.
+
+| Item do menu | O que faz |
+| --- | --- |
+| **Abrir no Edge** | Abre o app; com o servidor parado, sobe ele antes |
+| Reiniciar o servidor | Derruba e sobe de novo — útil ao mexer em `.env` ou no schema |
+| Ver o log | Abre a saída do servidor no Bloco de Notas |
+| Sair | Encerra o servidor e tira o ícone da bandeja |
+
+O ícone fica **cinza enquanto o servidor sobe** e volta a cor quando a porta
+atende: de relance, perto do relógio, isso responde "dá para estudar agora?"
+sem precisar parar o mouse em cima.
+
+A saída vai para `%LOCALAPPDATA%\NihongoHub\servidor.log`, fora da árvore do
+projeto — o `.next` é apagado a cada build, e um log versionado só sujaria o
+`git status`. Cada partida do servidor recomeça o arquivo.
+
+### Matar o servidor é matar uma árvore
+
+Quem escuta na 3100 não é quem foi iniciado. O `next dev` levanta um processo
+separado para o servidor HTTP, que por sua vez levanta os workers do Turbopack
+— quatro processos no total, em três níveis. Encerrar só o dono da porta
+deixaria três vivos, um deles pronto para reabri-la.
+
+Por isso o `Sair` e o `Reiniciar` sobem a árvore a partir da porta até o
+processo mais alto que ainda seja andaime (`node`, `cmd` ou `npm`) e matam dali
+com `taskkill /T`. A subida para no primeiro processo que não seja um desses —
+o `explorer.exe` ou o terminal que iniciou tudo — e também se o "pai" nasceu
+depois do filho, o que não é parentesco e sim um PID reciclado pelo Windows.
 
 | Comando | O que faz |
 | --- | --- |
-| `abrir.cmd` | Sobe o servidor e abre o Edge (duplo clique, Windows) |
+| `abrir.cmd` | Põe o NihongoHub na bandeja e abre o Edge (duplo clique, Windows) |
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm run build` | Build de produção |
 | `npm start` | Sobe o build de produção |
@@ -96,6 +145,7 @@ prisma/
   migrations/       Histórico versionado do schema.
   seed.ts           Popula os decks iniciais.
 scripts/
+  tray.ps1             Ícone da bandeja: sobe, reinicia e encerra o servidor.
   diagnostico-fuso.ts  Verifica a coerência de fuso entre Node e Postgres.
 ```
 
