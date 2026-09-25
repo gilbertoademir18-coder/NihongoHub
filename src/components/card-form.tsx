@@ -30,6 +30,21 @@ const NOMES: Record<string, string> = {
   katakana: "katakana",
 };
 
+/**
+ * Busca de imagens pelo texto japonês do card.
+ *
+ * Pelo japonês, e não pelo significado, porque é exatamente aí que o buscador
+ * grande ganha do nosso: `ごはん` devolve a tigela de arroz japonesa, enquanto
+ * "rice" devolveria um saco de grãos. A curadoria do `npm run imagens` existe
+ * para contornar as buscas ambíguas; aqui quem desempata é você, olhando.
+ *
+ * `udm=2` é a aba de imagens — o antigo `tbm=isch` ainda funciona, mas
+ * redireciona.
+ */
+function buscaNoGoogle(front: string) {
+  return `https://www.google.com/search?udm=2&q=${encodeURIComponent(front.trim())}`;
+}
+
 export function CardForm({
   decks,
   card,
@@ -293,6 +308,19 @@ export function CardForm({
                 "JPEG, PNG ou WebP. É reduzida no envio, então foto de celular serve."
               )}
             </p>
+
+            {front.trim() && (
+              <p className="mt-1 text-xs">
+                <a
+                  href={buscaNoGoogle(front)}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent hover:underline"
+                >
+                  Procurar <span className="jp">{front.trim()}</span> no Google Imagens ↗
+                </a>
+              </p>
+            )}
 
             {estado.erros.imagem && (
               <p role="alert" className="mt-1 text-xs text-accent">

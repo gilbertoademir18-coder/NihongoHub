@@ -458,6 +458,19 @@ um seletor de arquivo, e a imagem enviada substitui a baixada. Vale no cadastro,
 na lista e no modal que abre no meio da sessão de estudo — inclusive quando a
 imagem automática veio errada e você já tem a certa na mão.
 
+Ao lado do seletor há um link que abre o **Google Imagens já buscando pelo
+texto japonês do card** — pelo japonês, e não pelo significado, porque é aí que
+o buscador grande ganha do nosso: `アイス` devolve sorvete japonês de verdade,
+enquanto "ice cream" devolveria casquinha americana. O link usa `udm=2`, que é
+a aba de imagens atual; o antigo `tbm=isch` ainda funciona, mas é reescrito no
+caminho.
+
+Uma ressalva que o caminho automático não tem: imagem achada no Google **não
+vem com licença nem autor**, e o crédito gravado vira "Imagem enviada por você"
+— que diz como ela entrou aqui, não quem a fez. Para um app de estudo pessoal
+isso basta; se algum dia estas telas forem publicadas, as enviadas à mão são
+justamente as que precisam ser revistas.
+
 A imagem **é reduzida no navegador antes de subir**, para no máximo 960px de
 maior lado, recomprimida em WebP. São três problemas resolvidos de uma vez:
 
