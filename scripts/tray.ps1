@@ -159,11 +159,21 @@ function E-O-NihongoHub {
 <#
     Monta o ícone da bandeja a partir do PNG do PWA, em 32x32.
 
-    Cinza e meio apagado enquanto o servidor sobe, ou depois que ele cai: de
-    relance, perto do relógio, a cor responde "dá para estudar agora?" sem
-    precisar parar o mouse em cima para ler a dica.
+    O ícone é o painel de estado, e não a notificação: balão some em quatro
+    segundos, ícone fica. Cinza e meio apagado diz "não dá para estudar
+    agora"; o selo no canto diz por quê, sem precisar parar o mouse em cima
+    para ler a dica.
+
+      verde    no ar, pode estudar
+      vermelho o servidor caiu ou não subiu
+      nenhum   subindo — estado passageiro, não vale alarme
+
+    O selo tem um anel branco por baixo de propósito: a bandeja pode estar
+    sobre fundo claro ou escuro, e um ponto colorido sem contorno some num dos
+    dois. Em 16x16, que é como o Windows costuma desenhá-lo, é esse contraste
+    que o mantém legível.
 #>
-function Novo-Icone([bool]$apagado) {
+function Novo-Icone([bool]$apagado, [string]$selo) {
     $origem = [System.Drawing.Image]::FromFile((Join-Path $RAIZ "public\icon-192.png"))
     try {
         $tela = New-Object System.Drawing.Bitmap 32, 32
@@ -185,6 +195,22 @@ function Novo-Icone([bool]$apagado) {
         $destino = New-Object System.Drawing.Rectangle 0, 0, 32, 32
         $g.DrawImage($origem, $destino, 0, 0, $origem.Width, $origem.Height,
                      [System.Drawing.GraphicsUnit]::Pixel, $atrib)
+
+        if ($selo) {
+            $cor = if ($selo -eq "verde") {
+                [System.Drawing.Color]::FromArgb(255, 34, 170, 80)
+            } else {
+                [System.Drawing.Color]::FromArgb(255, 205, 40, 40)
+            }
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            # Encostado no canto: é o ponto mais longe do miolo do glifo, que
+            # é o que mantém o 語 reconhecível com o selo por cima.
+            $g.FillEllipse([System.Drawing.Brushes]::White, 16, 16, 16, 16)
+            $pincel = New-Object System.Drawing.SolidBrush $cor
+            $g.FillEllipse($pincel, 18, 18, 12, 12)
+            $pincel.Dispose()
+        }
+
         $g.Dispose()
 
         return [System.Drawing.Icon]::FromHandle($tela.GetHicon())
@@ -347,11 +373,12 @@ function Definir-Inicio-Automatico([bool]$ligar) {
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
-$iconeVivo    = Novo-Icone $false
-$iconeApagado = Novo-Icone $true
+$iconeNoAr    = Novo-Icone $false "verde"
+$iconeSubindo = Novo-Icone $true  ""
+$iconeParado  = Novo-Icone $true  "vermelho"
 
 $bandeja = New-Object System.Windows.Forms.NotifyIcon
-$bandeja.Icon    = $iconeApagado
+$bandeja.Icon    = $iconeSubindo
 $bandeja.Text    = "NihongoHub"
 $bandeja.Visible = $true
 
@@ -382,21 +409,29 @@ function Marcar([string]$novo) {
     $script:estado = $novo
     switch ($novo) {
         "subindo" {
-            $bandeja.Icon = $iconeApagado
+            $bandeja.Icon = $iconeSubindo
             $bandeja.Text = "NihongoHub — subindo o servidor..."
         }
         "no-ar" {
-            $bandeja.Icon = $iconeVivo
+            $bandeja.Icon = $iconeNoAr
             $bandeja.Text = "NihongoHub — no ar. Clique duas vezes para abrir."
         }
         "parado" {
-            $bandeja.Icon = $iconeApagado
+            $bandeja.Icon = $iconeParado
             $bandeja.Text = "NihongoHub — parado"
         }
     }
     $itemReiniciar.Enabled = ($novo -ne "subindo")
 }
 
+<#
+    Balão de notificação — só para o que deu errado.
+
+    Sucesso não interrompe: quem conta que está tudo bem é o selo verde do
+    ícone, e ele continua lá depois de o balão sumir. Balão de confirmação
+    treina a pessoa a dispensar o aviso sem ler, e aí o único que importava
+    passa despercebido junto.
+#>
 function Avisar([string]$texto, [string]$tipo) {
     $bandeja.ShowBalloonTip(4000, "NihongoHub", $texto, $tipo)
 }
@@ -431,7 +466,6 @@ $itemCode.add_Click({
 })
 
 $itemReiniciar.add_Click({
-    Avisar "Reiniciando o servidor..." "Info"
     Parar-Servidor
     $script:abrirAoSubir = $false
     Iniciar-Servidor
@@ -447,12 +481,9 @@ $itemStartup.add_Click({
     }
     # Quem manda é o arquivo, não a marca: se a escrita falhou, a marca volta
     # sozinha para a verdade em vez de mentir até o próximo clique.
+    # Sem confirmação em balão: a marca do próprio item é a resposta, e ela
+    # fica na tela enquanto o menu estiver aberto.
     $itemStartup.Checked = Inicio-Automatico-Ligado
-    if ($itemStartup.Checked) {
-        Avisar "O NihongoHub vai subir junto com o Windows." "Info"
-    } else {
-        Avisar "O NihongoHub não sobe mais junto com o Windows." "Info"
-    }
 })
 
 # A pasta Inicializar e a instalação do VS Code podem mudar por fora — vale
@@ -465,7 +496,7 @@ $menu.add_Opening({
 
 $itemLog.add_Click({
     if (Test-Path $LOG) { Start-Process notepad.exe -ArgumentList $LOG }
-    else { Avisar "Ainda não há log: o servidor não subiu nesta sessão." "Info" }
+    else { Avisar "Ainda não há log: o servidor não subiu nesta sessão." "Warning" }
 })
 
 $itemSair.add_Click({
@@ -486,8 +517,9 @@ $relogio.add_Tick({
 
     if ($script:estado -eq "subindo") {
         if ($ouvindo) {
+            # Sem balão de "está no ar": quem anuncia é o selo verde no
+            # ícone, que continua lá depois de o balão ter sumido.
             Marcar "no-ar"
-            Avisar "Servidor no ar em localhost:$PORTA. Clique no ícone para abrir." "Info"
             if ($script:abrirAoSubir) {
                 Abrir-Navegador
                 $script:abrirAoSubir = $false
@@ -537,7 +569,6 @@ if (Porta-Ouvindo) {
     # com o Windows — abrir uma janela por cima do que você estiver fazendo
     # seria o oposto de ficar fora do caminho.
     Iniciar-Servidor
-    Avisar "Subindo o servidor. Clique no ícone para abrir." "Info"
 }
 
 [System.Windows.Forms.Application]::Run()

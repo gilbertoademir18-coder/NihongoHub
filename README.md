@@ -64,9 +64,25 @@ bandeja. Não há dependência nova: o WinForms já vem com o Windows.
 | Ver o log | Abre a saída do servidor no Bloco de Notas |
 | Sair | Encerra o servidor e tira o ícone da bandeja |
 
-O ícone fica **cinza enquanto o servidor sobe** e volta a cor quando a porta
-atende: de relance, perto do relógio, isso responde "dá para estudar agora?"
-sem precisar parar o mouse em cima.
+### O ícone é o painel, o balão é só para problema
+
+O ícone carrega o estado o tempo todo, com um selo no canto:
+
+| Ícone | Estado |
+| --- | --- |
+| colorido, **selo verde** | no ar — pode estudar |
+| cinza, sem selo | subindo; estado passageiro, não vale alarme |
+| cinza, **selo vermelho** | o servidor caiu ou não subiu |
+
+**Notificação só aparece quando algo deu errado.** Sucesso não interrompe: quem
+conta que está tudo bem é o selo verde, e ele continua lá depois de qualquer
+balão ter sumido. Balão de confirmação treina a pessoa a dispensar o aviso sem
+ler — e aí o único que importava passa despercebido junto.
+
+O selo tem um anel branco por baixo de propósito: a bandeja pode estar sobre
+fundo claro ou escuro, e um ponto colorido sem contorno some num dos dois. Em
+16×16, que é como o Windows costuma desenhá-lo, é esse contraste que o mantém
+legível.
 
 O item do VS Code procura o `Code.exe` nos caminhos de instalação conhecidos, e
 fica **desabilitado** se não achar nenhum — a busca refaz a cada abertura do
