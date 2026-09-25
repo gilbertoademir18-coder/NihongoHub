@@ -44,6 +44,25 @@ export function soTemKana(texto: string): boolean {
 }
 
 /**
+ * De qual silabário é a palavra — ou `null` se ela não é de um só.
+ *
+ * É o que decide se o card entra numa sessão filtrada por hiragana ou
+ * katakana. Palavra com kanji, ou que mistura os dois silabários, devolve
+ * `null`: ela não pertence a nenhum dos dois filtros, e forçá-la para um lado
+ * faria uma sessão "só hiragana" mostrar katakana.
+ *
+ * O prolongador `ー` não decide nada sozinho — ele aparece em コーヒー, que é
+ * katakana, mas é o resto da palavra que diz isso.
+ */
+export function detectarScript(texto: string): "hiragana" | "katakana" | null {
+  const letras = [...texto].filter((c) => c !== PROLONGADOR);
+  if (letras.length === 0) return null;
+  if (letras.every(ehHiragana)) return "hiragana";
+  if (letras.every(ehKatakana)) return "katakana";
+  return null;
+}
+
+/**
  * Converte katakana em hiragana, preservando o resto.
  *
  * É o primeiro passo para comparar respostas: para quem digita romaji, コーヒー

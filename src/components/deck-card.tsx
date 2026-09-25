@@ -66,6 +66,15 @@ export function DeckCard({ deck }: { deck: DeckComStats }) {
             Treinar
           </Link>
         )}
+
+        {/* Longe dos botoes de estudo, e discreto: editar conteudo e uma
+            tarefa ocasional, enquanto estudar e o que se faz todo dia. */}
+        <Link
+          href={`/cards?deck=${deck.id}`}
+          className="ml-auto self-center text-sm text-muted transition-colors hover:text-accent"
+        >
+          Cards
+        </Link>
       </div>
 
       {/* O filtro de silabário só faz sentido onde há palavras em kana. */}

@@ -36,9 +36,14 @@ export default async function HomePage() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
-          Seus decks
-        </h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
+            Seus decks
+          </h2>
+          <Link href="/cards" className="text-sm text-accent hover:underline">
+            Gerenciar cards
+          </Link>
+        </div>
 
         {decks.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted">

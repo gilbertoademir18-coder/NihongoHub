@@ -178,7 +178,7 @@ src/
     seed-data.ts    O conteúdo dos decks iniciais (só dados).
     server/
       study.ts      Leituras do banco para as telas. Marcado `server-only`.
-  components/       Sessão de estudo e cards de deck.
+  components/       Sessão de estudo, cards de deck e formulário de card.
   app/
     actions.ts      Server Action que registra a revisão.
     page.tsx        Home (Server Component).
@@ -300,6 +300,57 @@ declaradas com motivo em `src/lib/kana.ts`: `を` só existe como partícula
 | `enter` | Ir para a próxima palavra | Digitar |
 | `enter` | Confirmar antes de completar a palavra | Digitar |
 
+## Cadastro e edição de cards
+
+`/cards` lista os cards de um deck, com busca por japonês ou por significado;
+daí se cadastra, edita e exclui. Chega pela home ("Gerenciar cards") ou pelo
+link "Cards" de cada deck.
+
+O **silabário não é um campo**: sai da frente do card. `ねこ` é hiragana,
+`コーヒー` é katakana, e `日` ou `ねこカフェ` não são nenhum dos dois — ficam de
+fora dos filtros, que é o correto, porque uma sessão "só hiragana" que mostrasse
+katakana estaria quebrando a própria promessa. Deixar escolher à mão só criaria
+card marcado errado.
+
+A **leitura precisa ser kana**, e cada alternativa separada por `・` é conferida
+sozinha. Não é purismo: o modo digitação converte o que você escreve em kana e
+compara com este campo, então romaji gravado aqui faria a resposta certa ser
+reprovada na hora de estudar. Sem checar pedaço a pedaço, `にち・nichi` passaria
+por ter kana no começo.
+
+Frente repetida no mesmo deck é barrada — quase sempre é cadastro em duplicata,
+e dois cards iguais viram duas revisões do mesmo conteúdo na mesma sessão.
+
+Card novo entra como **nunca estudado**: não fura a fila: só aparece quando o
+lote do deck abrir uma vaga.
+
+### Excluir apaga o histórico junto
+
+O `onDelete: Cascade` leva as revisões do card. É o comportamento certo —
+histórico de card que não existe mais não significa nada — mas é perda de dado
+real e não dá para desfazer, então a tela mostra quantas revisões vão embora
+antes de você confirmar.
+
+### A validação roda duas vezes, de propósito
+
+As regras vivem em `src/lib/card-form.ts`, em funções puras, e rodam no
+formulário e de novo na Server Action. Argumento de Server Action chega pela
+rede: validar só no navegador é não validar.
+
+### `"use server"` não exporta constante
+
+Num módulo `"use server"` **todo export precisa ser função async**, porque cada
+um vira um endpoint. O estado inicial do formulário chegou a morar lá e voltava
+`undefined` no cliente, quebrando a primeira renderização — por isso ele está em
+`src/lib/card-form.ts`, junto das regras.
+
+### Editar o termo de imagem sobrevive ao seed
+
+`npm run db:seed` **só preenche termo vazio**. Antes ele sobrescrevia, o que
+apagaria em silêncio um termo ajustado na tela — e semear é coisa que se faz sem
+pensar, depois de qualquer migração. Para reimpor a curadoria do código:
+`npm run db:seed -- --forcar-termos`.
+
 ## Imagens nos cards
 
 Cada card pode ter uma imagem, e ela aparece **só no lado da resposta**. Ver a
@@ -385,7 +436,7 @@ alinhados.
 
 ## Próximos passos
 
-- Criar e editar decks e cards pela interface (hoje só via seed)
+- Criar e editar **decks** pela interface (os cards já dá)
 - Contas de usuário — hoje o banco não separa por pessoa
 - Limite de cards novos por dia: o campo `newPerDay` existe, mas ainda não é
   aplicado na montagem da fila

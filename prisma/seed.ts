@@ -140,8 +140,14 @@ async function main() {
  *
  * Mexe **apenas** em `imageQuery`. O estado do SRS não é tocado: reexecutar o
  * seed não pode custar o progresso de ninguém.
+ *
+ * E só **preenche vazio**: desde que dá para editar o card pela tela, um seed
+ * que sobrescrevesse apagaria em silêncio o termo que alguém acabou de ajustar
+ * — e semear é coisa que se faz sem pensar, depois de qualquer migração. Para
+ * reimpor a curadoria do código, `npm run db:seed -- --forcar-termos`.
  */
 async function sincronizarTermosDeBusca() {
+  const forcar = process.argv.includes("--forcar-termos");
   const porFrente = new Map<string, string | null>();
   for (const deck of TODOS_OS_DECKS) {
     for (const card of deck.cards) porFrente.set(card.front, card.busca ?? null);
@@ -156,6 +162,7 @@ async function sincronizarTermosDeBusca() {
     if (!porFrente.has(card.front)) continue;
     const desejado = porFrente.get(card.front) ?? null;
     if (card.imageQuery === desejado) continue;
+    if (card.imageQuery !== null && !forcar) continue;
     await prisma.card.update({
       where: { id: card.id },
       data: { imageQuery: desejado },
@@ -165,8 +172,8 @@ async function sincronizarTermosDeBusca() {
 
   console.log(
     ajustados > 0
-      ? `· termos de busca de imagem: ${ajustados} card(s) atualizados`
-      : "· termos de busca de imagem: já em dia",
+      ? `· termos de busca de imagem: ${ajustados} card(s) preenchidos${forcar ? " (forçado)" : ""}`
+      : "· termos de busca de imagem: nada a preencher",
   );
 }
 
