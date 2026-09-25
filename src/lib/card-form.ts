@@ -39,8 +39,14 @@ export const CARD_VAZIO: DadosDoCard = {
   imageQuery: "",
 };
 
-/** Erros por campo. Objeto vazio significa que está tudo certo. */
-export type ErrosDoCard = Partial<Record<keyof DadosDoCard, string>>;
+/**
+ * Erros por campo. Objeto vazio significa que está tudo certo.
+ *
+ * `imagem` entra aqui apesar de não ser um campo de `DadosDoCard`: o arquivo
+ * não é texto e não passa por `normalizarCard`, mas o erro dele precisa
+ * aparecer do lado do seletor, como o de qualquer outro campo.
+ */
+export type ErrosDoCard = Partial<Record<keyof DadosDoCard | "imagem", string>>;
 
 function limpar(texto: string) {
   return texto.trim().replace(/\s+/g, " ");
@@ -155,6 +161,8 @@ export interface CardSalvo {
   front: string;
   reading: string;
   meaning: string;
+  /** A imagem depois do envio ou da remoção — `null` quando o card ficou sem. */
+  imagePath: string | null;
 }
 
 export const ESTADO_INICIAL: EstadoDoForm = { erros: {} };

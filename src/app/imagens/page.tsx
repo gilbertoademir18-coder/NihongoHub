@@ -36,7 +36,11 @@ export default async function ImagensPage() {
         {pendentes.length > 0 && ` · ${pendentes.length} ainda por buscar`}
       </p>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        Para trocar uma imagem, ajuste o termo em{" "}
+        Para trocar uma imagem só, o caminho curto é enviar a sua pelo{" "}
+        <Link href="/cards" className="text-accent hover:underline">
+          formulário do card
+        </Link>
+        . Para corrigir a busca automática, ajuste o termo em{" "}
         <code className="rounded bg-surface-muted px-1">src/lib/palavras-kana.ts</code>,
         rode <code className="rounded bg-surface-muted px-1">npm run db:seed</code> e
         depois <code className="rounded bg-surface-muted px-1">npm run imagens</code>.

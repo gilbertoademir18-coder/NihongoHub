@@ -1,12 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
-import {
-  carregarCardParaEdicao,
-  excluirCard,
-  limparImagem,
-} from "@/app/cards/actions";
+import { carregarCardParaEdicao, excluirCard } from "@/app/cards/actions";
 import type { CardSalvo } from "@/lib/card-form";
 import type { CardParaEditar, DeckSimples } from "@/lib/server/cards";
 import { CardForm } from "./card-form";
@@ -162,62 +157,10 @@ function ConteudoDoModal({
             aoCancelar={aoFechar}
           />
 
-          {carga.card.imagePath && (
-            <ImagemAtual
-              card={carga.card}
-              aoLimpar={() =>
-                setCarga({ ...carga, card: { ...carga.card, imagePath: null } })
-              }
-            />
-          )}
-
           <Excluir card={carga.card} aoExcluir={aoExcluir} />
         </>
       )}
     </div>
-  );
-}
-
-function ImagemAtual({
-  card,
-  aoLimpar,
-}: {
-  card: CardParaEditar;
-  aoLimpar: () => void;
-}) {
-  return (
-    <section className="mt-5 border-t border-border pt-4">
-      <h3 className="text-sm font-semibold">Imagem atual</h3>
-      <div className="mt-2 flex items-center gap-3">
-        <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-surface-muted">
-          <Image
-            src={card.imagePath!}
-            alt={card.meaning}
-            fill
-            sizes="7rem"
-            className="object-cover"
-          />
-        </div>
-        <div className="min-w-0 text-sm">
-          <p className="truncate text-muted">{card.imageCredit}</p>
-          <form
-            action={async (form) => {
-              await limparImagem(form);
-              aoLimpar();
-            }}
-            className="mt-1.5"
-          >
-            <input type="hidden" name="id" value={card.id} />
-            <button
-              type="submit"
-              className="rounded-lg border border-border px-2.5 py-1 text-xs hover:border-accent"
-            >
-              Descartar imagem
-            </button>
-          </form>
-        </div>
-      </div>
-    </section>
   );
 }
 

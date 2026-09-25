@@ -451,6 +451,43 @@ o termo que as trouxe. Achou uma errada, ajuste o `busca`, rode `npm run
 db:seed` (que propaga a curadoria para o banco sem tocar no seu progresso),
 limpe o `image_path` do card e rode `npm run imagens` de novo.
 
+### Enviar a imagem à mão
+
+Para um card específico, a curadoria dá voltas demais: o formulário do card tem
+um seletor de arquivo, e a imagem enviada substitui a baixada. Vale no cadastro,
+na lista e no modal que abre no meio da sessão de estudo — inclusive quando a
+imagem automática veio errada e você já tem a certa na mão.
+
+A imagem **é reduzida no navegador antes de subir**, para no máximo 960px de
+maior lado, recomprimida em WebP. São três problemas resolvidos de uma vez:
+
+| Sem reduzir | Com reduzir |
+| --- | --- |
+| Foto de celular tem 2–8MB | A de teste, 3024×4032 e 2,0MB, virou 720×960 e 178KB |
+| Server Action recusa corpo acima de 1MB, com erro cru do framework | Nem chega perto do limite (elevado para 3MB só por folga) |
+| O disco guardaria dez vezes o que a tela mostra | Fica na ordem das baixadas do Openverse |
+
+O redimensionamento é no cliente porque o servidor não tem biblioteca de imagem
+instalada — e porque assim os megabytes não sobem pela rede para serem jogados
+fora do outro lado.
+
+**O formato é conferido pelos bytes, não pela extensão.** O arquivo vai para
+`public/`, servido na mesma origem do app: um `.html` renomeado para `.jpg`
+seria script nosso aos olhos do navegador. JPEG, PNG e WebP passam; GIF é
+recusado com recado próprio, porque o redimensionamento congelaria a animação e
+entregar um GIF parado sem avisar seria pior que recusar.
+
+O nome do arquivo leva um sufixo que muda a cada envio
+(`<id>-<carimbo>.webp`). Sem isso, trocar a imagem mantendo `<id>.jpg` deixaria
+o navegador e o otimizador do `next/image` servindo a antiga — e a conclusão
+natural seria que o envio não funcionou.
+
+Remover a imagem é marcação, não ação imediata: o aviso diz *"a imagem sai ao
+salvar"* e você ainda pode clicar em *manter*. Assim tudo o que o formulário
+muda acontece no mesmo "Salvar", e fechar sem salvar desfaz tudo. O arquivo no
+disco é apagado quando a imagem é trocada, removida ou o card é excluído —
+ninguém varre a pasta, então o que ficasse ficaria para sempre.
+
 ## Notas
 
 **O app precisa do servidor.** Uma versão anterior guardava tudo em IndexedDB

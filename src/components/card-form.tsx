@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { salvarCard } from "@/app/cards/actions";
 import {
   type CardSalvo,
@@ -9,6 +9,8 @@ import {
   type EstadoDoForm,
   scriptDoCard,
 } from "@/lib/card-form";
+import { TIPOS_ACEITOS } from "@/lib/imagem";
+import { ImagemRecusada, prepararImagem } from "@/lib/imagem-cliente";
 import { SEPARADOR_LEITURAS } from "@/lib/kana";
 import { kanaParaRomaji } from "@/lib/romaji";
 import type { CardParaEditar } from "@/lib/server/cards";
@@ -57,6 +59,22 @@ export function CardForm({
   // estado, e fechar o modal duas vezes é o tipo de bug que só aparece depois.
   const [estado, enviar, enviando] = useActionState<EstadoDoForm, FormData>(
     async (anterior, form) => {
+      // A imagem encolhe aqui, antes de virar requisição: foto de celular tem
+      // megabytes, e Server Action recusa corpo grande com um erro do
+      // framework — sem campo, sem explicação e sem culpa aparente.
+      const escolhido = form.get("imagem");
+      if (escolhido instanceof File && escolhido.size > 0) {
+        try {
+          form.set("imagem", await prepararImagem(escolhido));
+        } catch (erro) {
+          const motivo =
+            erro instanceof ImagemRecusada
+              ? erro.message
+              : "Não consegui preparar esta imagem.";
+          return { ...anterior, erros: { imagem: motivo } };
+        }
+      }
+
       const resultado = await salvarCard(anterior, form);
       if (resultado.salvo) aoSalvar?.(resultado.salvo);
       return resultado;
@@ -69,7 +87,29 @@ export function CardForm({
   const [front, setFront] = useState(card?.front ?? "");
   const [reading, setReading] = useState(card?.reading ?? "");
 
+  // A imagem escolhida ainda não subiu: é só o arquivo local, para ver o que
+  // vai ser enviado antes de enviar.
+  const [previa, setPrevia] = useState<{ url: string; nome: string } | null>(null);
+  const [removida, setRemovida] = useState(false);
+  const urlDaPrevia = useRef<string | null>(null);
+  const campoArquivo = useRef<HTMLInputElement>(null);
+
+  // `createObjectURL` prende o arquivo na memória até alguém devolvê-lo.
+  function trocarPrevia(arquivo: File | null) {
+    if (urlDaPrevia.current) URL.revokeObjectURL(urlDaPrevia.current);
+    urlDaPrevia.current = arquivo ? URL.createObjectURL(arquivo) : null;
+    setPrevia(arquivo && urlDaPrevia.current ? { url: urlDaPrevia.current, nome: arquivo.name } : null);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (urlDaPrevia.current) URL.revokeObjectURL(urlDaPrevia.current);
+    };
+  }, []);
+
   const script = scriptDoCard(front);
+  const imagemAtual = removida ? null : (card?.imagePath ?? null);
+  const mostrada = previa?.url ?? imagemAtual;
   const voltarPara = `/cards${card ? `?deck=${card.deckId}` : deckPadrao ? `?deck=${deckPadrao}` : ""}`;
 
   return (
@@ -189,20 +229,94 @@ export function CardForm({
         />
       </Campo>
 
-      <Campo
-        rotulo="Termo de busca da imagem"
-        erro={estado.erros.imageQuery}
-        para="imageQuery"
-        dica="Deixe em branco para o card não ter imagem. A busca em si é feita depois, por npm run imagens."
-      >
-        <input
-          id="imageQuery"
-          name="imageQuery"
-          defaultValue={card?.imageQuery ?? ""}
-          className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-          autoComplete="off"
-        />
-      </Campo>
+      <section className="space-y-3 rounded-lg border border-border p-3">
+        <h3 className="text-sm font-medium">Imagem</h3>
+        {/* Marca a remoção em vez de executá-la na hora: assim tudo o que o
+            formulário muda acontece no mesmo "Salvar", e fechar sem salvar
+            desfaz tudo — inclusive isto. */}
+        {removida && <input type="hidden" name="removerImagem" value="1" />}
+
+        <div className="flex items-start gap-3">
+          <div className="h-20 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-surface-muted">
+            {mostrada ? (
+              // <img> puro: a prévia é um `blob:` do arquivo local, que o
+              // otimizador do next/image não tem como buscar.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={mostrada} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="grid h-full place-items-center text-xs text-muted">
+                sem imagem
+              </span>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <input
+              ref={campoArquivo}
+              id="imagem"
+              name="imagem"
+              type="file"
+              accept={TIPOS_ACEITOS}
+              onChange={(e) => {
+                const arquivo = e.target.files?.[0] ?? null;
+                trocarPrevia(arquivo);
+                if (arquivo) setRemovida(false);
+              }}
+              className="w-full text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-surface file:px-3 file:py-1.5 file:text-sm file:text-foreground hover:file:border-accent"
+            />
+
+            <p className="mt-1.5 text-xs text-muted">
+              {previa ? (
+                <>
+                  <span className="font-medium text-foreground">{previa.nome}</span>{" "}
+                  {imagemAtual ? "substitui a atual ao salvar." : "vai ser enviada ao salvar."}{" "}
+                  <BotaoTexto
+                    onClick={() => {
+                      trocarPrevia(null);
+                      if (campoArquivo.current) campoArquivo.current.value = "";
+                    }}
+                  >
+                    cancelar
+                  </BotaoTexto>
+                </>
+              ) : removida ? (
+                <>
+                  A imagem sai ao salvar.{" "}
+                  <BotaoTexto onClick={() => setRemovida(false)}>manter</BotaoTexto>
+                </>
+              ) : imagemAtual ? (
+                <>
+                  {card?.imageCredit ?? "Imagem atual"}.{" "}
+                  <BotaoTexto onClick={() => setRemovida(true)}>remover</BotaoTexto>
+                </>
+              ) : (
+                "JPEG, PNG ou WebP. É reduzida no envio, então foto de celular serve."
+              )}
+            </p>
+
+            {estado.erros.imagem && (
+              <p role="alert" className="mt-1 text-xs text-accent">
+                {estado.erros.imagem}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <Campo
+          rotulo="Termo de busca automática"
+          erro={estado.erros.imageQuery}
+          para="imageQuery"
+          dica="Só vale para card sem imagem: npm run imagens procura por este termo. Em branco, o card fica sem imagem de propósito."
+        >
+          <input
+            id="imageQuery"
+            name="imageQuery"
+            defaultValue={card?.imageQuery ?? ""}
+            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+            autoComplete="off"
+          />
+        </Campo>
+      </section>
 
       <div className="flex items-center gap-3 pt-2">
         <button
@@ -267,6 +381,21 @@ function Previa({
           : "Sem silabário próprio — fica fora dos filtros de hiragana e katakana."}
       </p>
     </div>
+  );
+}
+
+/** Ação secundária no meio de uma frase — "cancelar", "remover", "manter". */
+function BotaoTexto({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button type="button" onClick={onClick} className="text-accent hover:underline">
+      {children}
+    </button>
   );
 }
 
