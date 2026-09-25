@@ -5,13 +5,14 @@ com PostgreSQL.
 
 ## Começando
 
-No Windows, **dê um duplo clique em `abrir.cmd`**. Ele instala as dependências
-na primeira vez, sobe o servidor e abre o Microsoft Edge sozinho quando
-estiver pronto.
+No Windows, **dê um duplo clique em `NihongoHub.cmd`**. Ele instala as
+dependências na primeira vez, sobe o servidor e abre o Microsoft Edge sozinho
+quando estiver pronto.
 
 O servidor não fica numa janela: ele vira um **ícone na bandeja**, perto do
 relógio. Clique com o botão direito para abrir o app, reiniciar o servidor,
-ver o log ou sair — e é o "Sair" que encerra tudo.
+ver o log ou sair — e é o "Sair" que encerra tudo. Marcando **Iniciar com o
+Windows**, ele já está de pé quando você senta para estudar.
 
 Ou pela linha de comando:
 
@@ -45,15 +46,16 @@ Um servidor de desenvolvimento precisa ficar vivo enquanto se estuda, mas isso
 não obriga ninguém a manter um prompt aberto no meio da tela — e uma janela que
 não pode ser fechada é uma janela que uma hora será fechada por engano.
 
-O `abrir.cmd` só cuida do que pode falhar antes de existir ícone para avisar
-(Node ausente, dependências faltando) e entrega o resto a `scripts/tray.ps1`,
-que sobe o `next dev` como processo oculto e fica na bandeja. Não há
-dependência nova: o WinForms já vem com o Windows.
+O `NihongoHub.cmd` só cuida do que pode falhar antes de existir ícone para
+avisar (Node ausente, dependências faltando) e entrega o resto a
+`scripts/tray.ps1`, que sobe o `next dev` como processo oculto e fica na
+bandeja. Não há dependência nova: o WinForms já vem com o Windows.
 
 | Item do menu | O que faz |
 | --- | --- |
 | **Abrir no Edge** | Abre o app; com o servidor parado, sobe ele antes |
 | Reiniciar o servidor | Derruba e sobe de novo — útil ao mexer em `.env` ou no schema |
+| Iniciar com o Windows | Liga e desliga a subida automática no login |
 | Ver o log | Abre a saída do servidor no Bloco de Notas |
 | Sair | Encerra o servidor e tira o ícone da bandeja |
 
@@ -64,6 +66,20 @@ sem precisar parar o mouse em cima.
 A saída vai para `%LOCALAPPDATA%\NihongoHub\servidor.log`, fora da árvore do
 projeto — o `.next` é apagado a cada build, e um log versionado só sujaria o
 `git status`. Cada partida do servidor recomeça o arquivo.
+
+### Iniciar com o Windows
+
+A opção grava um atalho na pasta Inicializar do usuário — caminho pedido ao
+Windows, e não montado à mão, porque ele muda com o idioma da instalação. O
+atalho aponta para o `NihongoHub.cmd` com a janela **minimizada**: a
+conferência de Node e dependências ainda precisa de um console, mas no login
+ele aparece na barra de tarefas em vez de saltar por cima do que estiver na
+tela.
+
+A marca do menu não confia na própria memória: ela lê o atalho e compara o
+alvo com esta cópia do projeto. Assim um atalho esquecido por uma pasta antiga
+não aparece como ligado — mover o projeto apenas desmarca a opção, e religá-la
+reescreve o atalho para o lugar certo.
 
 ### Matar o servidor é matar uma árvore
 
@@ -80,7 +96,7 @@ depois do filho, o que não é parentesco e sim um PID reciclado pelo Windows.
 
 | Comando | O que faz |
 | --- | --- |
-| `abrir.cmd` | Põe o NihongoHub na bandeja e abre o Edge (duplo clique, Windows) |
+| `NihongoHub.cmd` | Põe o NihongoHub na bandeja e abre o Edge (duplo clique, Windows) |
 | `npm run dev` | Servidor de desenvolvimento |
 | `npm run build` | Build de produção |
 | `npm start` | Sobe o build de produção |

@@ -8,7 +8,7 @@
 
     Não depende de pacote nenhum: o WinForms já vem com o Windows.
 
-    Não é para ser executado direto — use o abrir.cmd, que o inicia sem
+    Não é para ser executado direto — use o NihongoHub.cmd, que o inicia sem
     janela. Rodando na mão, a janela do PowerShell fica aberta atrás do ícone,
     que é justamente o que queríamos evitar.
 #>
@@ -234,6 +234,59 @@ function Abrir-Navegador {
 }
 
 # ---------------------------------------------------------------------------
+# Início automático
+# ---------------------------------------------------------------------------
+
+# A pasta Inicializar do usuário — pedida ao Windows em vez de montada à mão,
+# porque o caminho muda com o idioma da instalação.
+$ATALHO_STARTUP = Join-Path ([Environment]::GetFolderPath("Startup")) "NihongoHub.lnk"
+$LANCADOR       = Join-Path $RAIZ "NihongoHub.cmd"
+
+<#
+    O atalho existe *e* aponta para esta cópia do projeto?
+
+    Só a existência não serve: um atalho deixado para trás por uma pasta
+    antiga marcaria a opção como ligada enquanto, na prática, não sobe nada.
+    Comparando o alvo, mover o projeto apenas desmarca a opção — e religá-la
+    reescreve o atalho para o lugar certo.
+#>
+function Inicio-Automatico-Ligado {
+    if (-not (Test-Path $ATALHO_STARTUP)) { return $false }
+    $shell = New-Object -ComObject WScript.Shell
+    try {
+        return ($shell.CreateShortcut($ATALHO_STARTUP).TargetPath -eq $LANCADOR)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ReleaseComObject($shell) | Out-Null
+    }
+}
+
+<#
+    Liga ou desliga a subida junto com o Windows.
+
+    A janela do atalho é "minimizada" (7): o NihongoHub.cmd ainda confere o
+    Node e as dependências antes de passar a bola, e essa conferência precisa
+    de um console — mas no login ela aparece na barra de tarefas em vez de
+    saltar por cima do que estiver na tela.
+#>
+function Definir-Inicio-Automatico([bool]$ligar) {
+    if (-not $ligar) {
+        if (Test-Path $ATALHO_STARTUP) { Remove-Item $ATALHO_STARTUP -Force }
+        return
+    }
+    $shell = New-Object -ComObject WScript.Shell
+    try {
+        $atalho = $shell.CreateShortcut($ATALHO_STARTUP)
+        $atalho.TargetPath       = $LANCADOR
+        $atalho.WorkingDirectory = $RAIZ
+        $atalho.WindowStyle      = 7
+        $atalho.Description      = "Põe o NihongoHub na bandeja do sistema"
+        $atalho.Save()
+    } finally {
+        [Runtime.InteropServices.Marshal]::ReleaseComObject($shell) | Out-Null
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Bandeja
 # ---------------------------------------------------------------------------
 
@@ -254,6 +307,9 @@ $itemAbrir = $menu.Items.Add("Abrir no Edge")
 $itemAbrir.Font = New-Object System.Drawing.Font($menu.Font, [System.Drawing.FontStyle]::Bold)
 $itemReiniciar = $menu.Items.Add("Reiniciar o servidor")
 $menu.Items.Add("-") | Out-Null
+$itemStartup = $menu.Items.Add("Iniciar com o Windows")
+$itemStartup.CheckOnClick = $true
+$itemStartup.Checked = Inicio-Automatico-Ligado
 $itemLog = $menu.Items.Add("Ver o log")
 $menu.Items.Add("-") | Out-Null
 $itemSair = $menu.Items.Add("Sair")
@@ -313,6 +369,28 @@ $itemReiniciar.add_Click({
     Iniciar-Servidor
 })
 
+$itemStartup.add_Click({
+    # `CheckOnClick` já virou a marca antes deste clique chegar aqui; é ela
+    # que diz o que a pessoa acabou de pedir.
+    try {
+        Definir-Inicio-Automatico $itemStartup.Checked
+    } catch {
+        Avisar "Não consegui mudar o início automático: $($_.Exception.Message)" "Error"
+    }
+    # Quem manda é o arquivo, não a marca: se a escrita falhou, a marca volta
+    # sozinha para a verdade em vez de mentir até o próximo clique.
+    $itemStartup.Checked = Inicio-Automatico-Ligado
+    if ($itemStartup.Checked) {
+        Avisar "O NihongoHub vai subir junto com o Windows." "Info"
+    } else {
+        Avisar "O NihongoHub não sobe mais junto com o Windows." "Info"
+    }
+})
+
+# A pasta Inicializar pode mudar por fora — vale reler a cada abertura do menu
+# em vez de confiar no que era verdade quando o ícone subiu.
+$menu.add_Opening({ $itemStartup.Checked = Inicio-Automatico-Ligado })
+
 $itemLog.add_Click({
     if (Test-Path $LOG) { Start-Process notepad.exe -ArgumentList $LOG }
     else { Avisar "Ainda não há log: o servidor não subiu nesta sessão." "Info" }
@@ -371,7 +449,7 @@ $relogio.Start()
 
 if (Porta-Ouvindo) {
     if (E-O-NihongoHub) {
-        # Já havia um servidor rodando — de um abrir.cmd antigo, por exemplo.
+        # Já havia um servidor rodando — de um NihongoHub.cmd antigo, por exemplo.
         # Adotamos em vez de subir outro: a porta é uma só.
         Marcar "no-ar"
         Abrir-Navegador
