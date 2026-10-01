@@ -79,10 +79,10 @@ conta que está tudo bem é o selo verde, e ele continua lá depois de qualquer
 balão ter sumido. Balão de confirmação treina a pessoa a dispensar o aviso sem
 ler — e aí o único que importava passa despercebido junto.
 
-O selo tem um anel branco por baixo de propósito: a bandeja pode estar sobre
-fundo claro ou escuro, e um ponto colorido sem contorno some num dos dois. Em
-16×16, que é como o Windows costuma desenhá-lo, é esse contraste que o mantém
-legível.
+O desenho segue o do reWASD: ícone recortado em círculo e selo com um anel
+preto em volta. O anel é de propósito: a bandeja pode estar sobre fundo claro
+ou escuro, e um ponto colorido sem contorno some num dos dois. Em 16×16, que é
+como o Windows costuma desenhá-lo, é esse contraste que o mantém legível.
 
 O item do VS Code procura o `Code.exe` nos caminhos de instalação conhecidos, e
 fica **desabilitado** se não achar nenhum — a busca refaz a cada abertura do
