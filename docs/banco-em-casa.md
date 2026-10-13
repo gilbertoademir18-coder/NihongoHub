@@ -47,18 +47,25 @@ casa — pendrive, ou `scp` pelo próprio tailnet. Então:
 .\scripts\restaurar-banco.ps1
 ```
 
-Ele pega o `.dump` mais recente de `backups\`, pede a senha do `postgres` e a
-senha que o app vai usar, cria o papel e o banco, restaura e confere as
-contagens. Se o banco já existir com tabelas, ele **para** em vez de misturar
-dois estados.
+Ele pega o `.dump` mais recente de `backups\` e pede só a senha do
+`postgres`. A senha do app ele gera sozinho. Cria o papel e o banco, restaura,
+confere as contagens, escreve o `DATABASE_URL` no `.env` e roda
+`prisma migrate status` para provar que a URL abre e que as migrações batem.
 
-No fim, ele imprime o `DATABASE_URL` para o `.env` de casa.
+Ele **para** antes de mexer em qualquer coisa se o `.env` já tiver
+`DATABASE_URL`, e para antes do restore se o banco já existir com tabelas —
+em vez de misturar dois estados.
 
 ### 4. O `.env` de casa
+
+O script já escreveu esta linha, com a senha gerada:
 
 ```
 DATABASE_URL="postgresql://nihongohub:<senha>@127.0.0.1:5432/nihongohub?options=-c%20timezone%3DUTC"
 ```
+
+É essa senha que vai no `.env` do trabalho (passo "Aqui, depois"), trocando
+`127.0.0.1` pelo IP do tailnet.
 
 Em casa o app fala com o banco por `127.0.0.1` — está na mesma máquina. O
 `options=-c timezone=UTC` não é enfeite: sem ele, o vencimento dos cards passa
@@ -74,20 +81,39 @@ npm run imagens:conferir
 
 ### 5. Abrir a porta para o tailnet
 
+O Postgres é compartilhado com os outros projetos da máquina, então quem
+libera o acesso é o script comum, que mora no Creativa e serve para qualquer
+projeto em que banco e usuário têm o mesmo nome:
+
 ```powershell
 # PowerShell como administrador
-.\scripts\abrir-banco-no-tailnet.ps1
+cd C:\Projetos\Creativa
+.\scripts\liberar-banco-no-tailnet.ps1 -Banco nihongohub
 ```
 
-Para ver o que ele faria sem tocar em nada: `-Simular`.
-
-Ele faz três coisas, guardando cópia `.bak` de cada arquivo que altera:
+O acesso passa por três portões, e os três precisam estar abertos:
 
 | O quê | Por quê |
 | --- | --- |
-| `listen_addresses = '*'` | O IP `100.x` só existe depois que o Tailscale sobe, e o Postgres sobe antes. Fixar o IP faria o banco não iniciar depois de um reboot. |
-| `pg_hba.conf`: `100.64.0.0/10  scram-sha-256` | Quem pode entrar. Restringe à faixa do Tailscale, não à internet. |
-| Firewall: TCP 5432 só de `100.64.0.0/10` | Segunda tranca. O `'*'` acima escuta em toda interface — Wi-Fi de hotel incluído; é esta regra que decide quem chega. |
+| `listen_addresses = '*'` | O IP `100.x` só existe depois que o Tailscale sobe, e o Postgres sobe antes. Fixar o IP faria o banco não iniciar depois de um reboot. O script só confere este; nunca muda. |
+| `pg_hba.conf`: `host nihongohub nihongohub 100.64.0.0/10 scram-sha-256` | Quem pode entrar: só este banco e este usuário, só da faixa do Tailscale, com senha. O script acrescenta a linha se faltar, com backup datado do arquivo. |
+| Firewall: regra `PostgreSQL - tailnet`, TCP 5432 só de `100.64.0.0/10`, perfil Private | Segunda tranca. O `'*'` acima escuta em toda interface — Wi-Fi de hotel incluído; é esta regra que decide quem chega. Uma regra só para todos os projetos. |
+
+Rodar de novo é seguro: cada passo confere o seu e só completa o que falta. O
+`pg_hba` é aplicado com **reload**, nunca restart — um restart derrubaria os
+outros projetos que usam o mesmo Postgres.
+
+Para provar o `pg_hba`, conecte pelo IP do tailnet, nunca por `127.0.0.1`
+(loopback passa mesmo com o `pg_hba` fechado):
+
+```powershell
+psql -h 100.65.76.22 -U nihongohub -d nihongohub -c "SELECT 1"
+```
+
+Isso não prova o firewall: conectar no próprio IP não passa por ele. O
+firewall só se prova da outra máquina (veja "Aqui, depois"). O padrão
+completo, com o que nunca fazer, está em
+`C:\Projetos\Creativa\docs\padrao-de-projeto.md`, seção 7.
 
 O `'*'` sozinho seria descuidado. É o par pg_hba + firewall que faz o acesso
 ser só pelo tailnet.
@@ -204,7 +230,9 @@ gravação incharia o repositório sem dar nada em troca.
 **Máquina de casa desligada = app parado.** Não é degradação, é falha: toda
 tela consulta o banco. Se acontecer com frequência, o remédio é inverter o
 arranjo — rodar o app inteiro em casa e daqui só abrir
-`http://100.65.76.22:3100` no navegador.
+`https://<máquina>.<tailnet>.ts.net:8446` no navegador. Esse endereço já
+está publicado pelo `scripts\publicar-no-tailnet.ps1` (e o tray copia ele em
+"Copiar link do tailnet").
 
 **Cada página faz várias consultas, e todas atravessam a rede.** Tailscale
 costuma fechar rota direta, então são alguns milissegundos por consulta; dá

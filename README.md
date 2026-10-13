@@ -523,9 +523,8 @@ Quatro comandos sustentam isso:
 | Comando | O que faz |
 | --- | --- |
 | `npm run backup` | Dump em `backups\`, verificado abrindo o arquivo depois de gravar |
-| `.\scripts
-estaurar-banco.ps1` | Cria papel e banco numa máquina nova e restaura o dump |
-| `.\scriptsbrir-banco-no-tailnet.ps1` | `listen_addresses`, `pg_hba.conf` e firewall, restritos à faixa do Tailscale |
+| `.\scripts\restaurar-banco.ps1` | Cria papel e banco numa máquina nova e restaura o dump |
+| `C:\Projetos\Creativa\scripts\liberar-banco-no-tailnet.ps1 -Banco nihongohub` | `pg_hba.conf` e firewall, restritos à faixa do Tailscale (script comum a todos os projetos; como administrador) |
 | `npm run imagens:conferir` | Acha card apontando para imagem que não está nesta máquina |
 
 O último existe porque **imagem de card é arquivo, não linha no banco**: com o

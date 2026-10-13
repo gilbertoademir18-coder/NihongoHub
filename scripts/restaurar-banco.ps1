@@ -11,13 +11,22 @@
     Idempotente: papel e banco existentes são reaproveitados, e o restore
     recusa banco que já tenha tabelas, para não misturar dois estados.
 
+    No fim, escreve o DATABASE_URL no `.env` e confere com o Prisma que as
+    migrações do banco batem com as do código. Se o `.env` já tiver
+    DATABASE_URL, o script para antes de tudo: trocar a senha do papel
+    deixaria o app sem conseguir entrar no banco que ele já usa.
+
 .EXAMPLE
     .\scripts\restaurar-banco.ps1 -Dump .\backups\nihongohub-20260925-1542.dump
 
 .NOTES
-    Pede a senha do superusuário `postgres` (a que você definiu na instalação)
-    e a senha que o app vai usar. Nenhuma das duas fica no disco nem no
-    histórico do PowerShell.
+    Pede só a senha do superusuário `postgres` (a que você definiu na
+    instalação), que não fica no disco nem no histórico do PowerShell. A senha
+    do app é gerada aqui e só existe no `.env`.
+
+    O papel ganha CREATEDB porque o `prisma migrate dev` cria um banco-sombra
+    temporário para calcular o diff. Não é superusuário e não enxerga os outros
+    bancos do servidor.
 #>
 
 [CmdletBinding()]
@@ -29,16 +38,17 @@ param(
     # Quem tem permissão de criar banco e papel. `postgres` no instalador
     # padrão do Windows; muda em instalação gerenciada.
     [string]$Superusuario = "postgres",
-    # Para automação. Sem elas, o script pergunta — que é o normal, porque
-    # senha em parâmetro fica no histórico do PowerShell. `-SenhaApp` pode
-    # ficar de fora quando o papel já existe e você não quer trocar a senha
-    # dele: é o caso de restaurar um segundo banco na mesma máquina.
+    # Para automação. Sem ela, o script pergunta — que é o normal, porque
+    # senha em parâmetro fica no histórico do PowerShell.
     [string]$SenhaSuper,
+    # Sem isto, uma senha aleatória é gerada. Passe quando quiser a mesma
+    # senha que já está no .env de outra máquina.
     [string]$SenhaApp
 )
 
 $ErrorActionPreference = "Stop"
 $RAIZ = Split-Path -Parent $PSScriptRoot
+$ENV_ARQUIVO = Join-Path $RAIZ ".env"
 
 function Falar([string]$texto) { Write-Host $texto }
 
@@ -54,6 +64,12 @@ function Rodar([string]$exe, [string[]]$argumentos) {
 }
 function Erro([string]$texto) { Write-Host "  x $texto" -ForegroundColor Red }
 function Feito([string]$texto) { Write-Host "  - $texto" -ForegroundColor Green }
+
+if ((Test-Path $ENV_ARQUIVO) -and (Select-String -Path $ENV_ARQUIVO -Pattern '^\s*DATABASE_URL\s*=' -Quiet)) {
+    Erro "O .env já tem DATABASE_URL. Nada a fazer."
+    Falar "    Se é para refazer o banco do zero, tire a linha do .env antes."
+    exit 1
+}
 
 # --- Onde estão os binários -------------------------------------------------
 # Descobertos pelo serviço, e não por caminho fixo: a versão do PostgreSQL da
@@ -135,23 +151,28 @@ Feito "conectado como '$Superusuario'"
 $temPapel = (& $psql -h 127.0.0.1 -U $Superusuario -d postgres -Atc `
     "select 1 from pg_roles where rolname = '$Usuario'") -eq "1"
 
-if (-not $temPapel -and -not $SenhaApp) {
-    $SenhaApp = Read-Host "Senha para o novo usuário '$Usuario' (a que vai no DATABASE_URL)" -AsSecureString
+if ($SenhaApp) {
+    $SenhaApp = Texto $SenhaApp
+} else {
+    # Só letras e números: a senha vai dentro de uma URL, e assim não precisa
+    # de escape nenhum.
+    $caracteres = [char[]]"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
+    $bytes = New-Object byte[] 32
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $SenhaApp = -join ($bytes | ForEach-Object { $caracteres[$_ % $caracteres.Length] })
 }
 
-if ($temPapel -and -not $SenhaApp) {
-    Feito "papel '$Usuario' já existe — mantendo a senha atual"
-} else {
-    # A senha entra por variável do psql, não interpolada no SQL: senha com
-    # aspas quebraria o comando, e o texto ficaria legível no log do servidor.
-    $env:PGAPPPASS = Texto $SenhaApp
-    $verbo = if ($temPapel) { "ALTER" } else { "CREATE" }
-    & $psql -h 127.0.0.1 -U $Superusuario -d postgres -v "senha=$env:PGAPPPASS" -Atc `
-        "$verbo ROLE $Usuario WITH LOGIN PASSWORD :'senha'" | Out-Null
-    $env:PGAPPPASS = ""
-    if ($LASTEXITCODE -ne 0) { Erro "Falhou ao $verbo o papel '$Usuario'."; $env:PGPASSWORD = ""; exit 1 }
-    Feito $(if ($temPapel) { "papel '$Usuario' já existia — senha atualizada" } else { "papel '$Usuario' criado" })
-}
+# Mesmo com o papel já existindo, a senha é redefinida: o .env que vamos
+# escrever precisa conseguir entrar.
+#
+# A senha entra por variável do psql, não interpolada no SQL: senha com aspas
+# quebraria o comando, e o texto ficaria legível no log do servidor. E vai
+# pela entrada padrão, não por `-c`: o psql não substitui variáveis no `-c`.
+$verbo = if ($temPapel) { "ALTER" } else { "CREATE" }
+"$verbo ROLE $Usuario WITH LOGIN CREATEDB PASSWORD :'senha';" |
+    & $psql -h 127.0.0.1 -U $Superusuario -d postgres -v "senha=$SenhaApp" -v ON_ERROR_STOP=1 -Atq | Out-Null
+if ($LASTEXITCODE -ne 0) { Erro "Falhou ao $verbo o papel '$Usuario'."; $env:PGPASSWORD = ""; exit 1 }
+Feito $(if ($temPapel) { "papel '$Usuario' já existia — senha redefinida" } else { "papel '$Usuario' criado" })
 
 # --- Banco ------------------------------------------------------------------
 $temBanco = & $psql -h 127.0.0.1 -U $Superusuario -d postgres -Atc `
@@ -170,7 +191,8 @@ if ($temBanco -eq "1") {
     Feito "banco '$Banco' já existia, e está vazio"
 } else {
     & $psql -h 127.0.0.1 -U $Superusuario -d postgres -Atc `
-        "CREATE DATABASE $Banco OWNER $Usuario ENCODING 'UTF8'" | Out-Null
+        "CREATE DATABASE $Banco OWNER $Usuario ENCODING 'UTF8' TEMPLATE template0" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Erro "Falhou ao criar o banco '$Banco'."; $env:PGPASSWORD = ""; exit 1 }
     Feito "banco '$Banco' criado"
 }
 
@@ -210,23 +232,38 @@ $contagem = & $psql -h 127.0.0.1 -U $Superusuario -d $Banco -Atc `
     "select 'decks='||(select count(*) from decks)||' cards='||(select count(*) from cards)||' reviews='||(select count(*) from reviews)||' migracoes='||(select count(*) from _prisma_migrations)"
 Feito "restaurado: $contagem"
 
-if ($SenhaApp) {
-    $env:PGPASSWORD = Texto $SenhaApp
-    $comoApp = & $psql -h 127.0.0.1 -U $Usuario -d $Banco -Atc "select count(*) from cards"
-    $env:PGPASSWORD = ""
+$env:PGPASSWORD = $SenhaApp
+$comoApp = & $psql -h 127.0.0.1 -U $Usuario -d $Banco -Atc "select count(*) from cards"
+$env:PGPASSWORD = ""
+if ($LASTEXITCODE -ne 0) {
+    Erro "O banco restaurou, mas '$Usuario' não consegue ler. Confira o pg_hba.conf."
+    exit 1
+}
+Feito "'$Usuario' lê o banco ($comoApp cards)"
+
+# --- .env -------------------------------------------------------------------
+# timezone=UTC na conexão: sem ele, o vencimento dos cards passa a depender do
+# fuso de cada máquina, e estudar em dois lugares daria duas respostas para "o
+# que vence hoje".
+$url = "postgresql://${Usuario}:$SenhaApp@127.0.0.1:5432/${Banco}?options=-c%20timezone%3DUTC"
+# UTF-8 sem BOM: o `-Encoding utf8` do PowerShell 5.1 põe BOM, e o Node leria
+# a primeira chave como "<BOM>DATABASE_URL" — variável que ninguém procura.
+[IO.File]::AppendAllText($ENV_ARQUIVO, "DATABASE_URL=`"$url`"`r`n", (New-Object Text.UTF8Encoding $false))
+Feito ".env escrito"
+
+# O Prisma lendo o .env recém-escrito é a prova de ponta a ponta: a URL abre,
+# e as migrações do banco são as mesmas do código.
+Push-Location $RAIZ
+try {
+    Rodar "npx.cmd" @("prisma", "migrate", "status", "--config", "prisma7.config.ts") |
+        ForEach-Object { Falar "    $_" }
     if ($LASTEXITCODE -ne 0) {
-        Erro "O banco restaurou, mas '$Usuario' não consegue ler. Confira o pg_hba.conf."
+        Erro "O Prisma acha que banco e código divergem — veja acima."
         exit 1
     }
-    Feito "'$Usuario' lê o banco ($comoApp cards)"
-} else {
-    $env:PGPASSWORD = ""
-    Feito "senha de '$Usuario' não informada — pulei o teste de leitura como app"
-}
+    Feito "migrações do banco batem com as do código"
+} finally { Pop-Location }
 
 Falar ""
-Falar "Ponha isto no .env desta máquina:"
-Falar "  DATABASE_URL=`"postgresql://${Usuario}:<senha>@127.0.0.1:5432/${Banco}?options=-c%20timezone%3DUTC`""
-Falar ""
 Falar "Para liberar o acesso pelo tailnet, rode em seguida (como administrador):"
-Falar "  .\scripts\abrir-banco-no-tailnet.ps1"
+Falar "  C:\Projetos\Creativa\scripts\liberar-banco-no-tailnet.ps1 -Banco nihongohub"
