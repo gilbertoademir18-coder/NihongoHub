@@ -58,6 +58,10 @@ $PORTA = 3100
 $URL   = "http://localhost:$PORTA"
 $BIN   = Join-Path $RAIZ "node_modules\next\dist\bin\next"
 
+# A porta HTTPS que o `tailscale serve` publica (ver scripts\publicar-no-tailnet.ps1).
+# A 443 desta máquina é de outro app, e a 8443 a 8445 são do Trimly e do Creativa.
+$PORTA_TAILNET = 8446
+
 # O log vai para fora do projeto: o .next é apagado a cada build, e um arquivo
 # de log dentro da árvore versionada só serviria para sujar o git status.
 $PASTA_LOG = Join-Path $env:LOCALAPPDATA "NihongoHub"
@@ -307,6 +311,16 @@ function Abrir-Navegador {
     Start-Process $URL
 }
 
+<# O endereço HTTPS no tailnet, ou $null sem Tailscale. #>
+function Url-Tailnet {
+    try {
+        $status = & tailscale status --json 2>$null | ConvertFrom-Json
+        $nome = $status.Self.DNSName.TrimEnd(".")
+        if ($nome) { return "https://${nome}:$PORTA_TAILNET" }
+    } catch { }
+    return $null
+}
+
 $WORKSPACE = Join-Path $RAIZ "NihongoHub.code-workspace"
 
 <#
@@ -405,7 +419,8 @@ $bandeja.ContextMenuStrip = $menu
 
 $itemAbrir = $menu.Items.Add("Abrir no Edge")
 $itemAbrir.Font = New-Object System.Drawing.Font($menu.Font, [System.Drawing.FontStyle]::Bold)
-$itemCode = $menu.Items.Add("Abrir no VS Code")
+$itemLink = $menu.Items.Add("Copiar link do tailnet")
+$itemCode =$menu.Items.Add("Abrir no VS Code")
 $itemReiniciar = $menu.Items.Add("Reiniciar o servidor")
 $menu.Items.Add("-") | Out-Null
 $itemStartup = $menu.Items.Add("Iniciar com o Windows")
@@ -470,6 +485,16 @@ $itemAbrir.add_Click({
 })
 
 $bandeja.add_DoubleClick({ $itemAbrir.PerformClick() })
+
+$itemLink.add_Click({
+    $link = Url-Tailnet
+    if (-not $link) {
+        Avisar "Não consegui falar com o Tailscale. Ele está rodando?" "Error"
+        return
+    }
+    [System.Windows.Forms.Clipboard]::SetText($link)
+    Avisar "Copiado: $link`nAbra em outro PC do tailnet." "Info"
+})
 
 $itemCode.add_Click({
     $code = Achar-VsCode

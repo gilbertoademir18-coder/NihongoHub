@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // O app roda em `next dev` (veja `scripts/tray.ps1`) e é publicado no
+  // tailnet por `tailscale serve` (veja `scripts/publicar-no-tailnet.ps1`).
+  // Sem isto, o dev server recusa os próprios assets quando a página é aberta
+  // por `<máquina>.<tailnet>.ts.net` em vez de localhost.
+  allowedDevOrigins: ["*.*.ts.net"],
+
   experimental: {
     serverActions: {
       // O padrão é 1MB, e o corpo carrega a imagem do card junto do
