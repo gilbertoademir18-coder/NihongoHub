@@ -57,7 +57,7 @@ bandeja. Não há dependência nova: o WinForms já vem com o Windows.
 
 | Item do menu | O que faz |
 | --- | --- |
-| **Abrir no Edge** | Abre o app — o único caminho até o navegador. Com o servidor parado, sobe ele antes |
+| **Abrir no Edge** (ou Firefox) | Abre o app no navegador do `NAVEGADOR` do `.env` (`edge`, o padrão, ou `firefox`) — o único caminho até o navegador. Com o servidor parado, sobe ele antes |
 | Abrir no VS Code | Abre `NihongoHub.code-workspace` — ou a pasta, se ele não existir |
 | Reiniciar o servidor | Derruba e sobe de novo — útil ao mexer em `.env` ou no schema |
 | Iniciar com o Windows | Liga e desliga a subida automática no login |

@@ -67,6 +67,35 @@ $PORTA_TAILNET = 8446
 $PASTA_LOG = Join-Path $env:LOCALAPPDATA "NihongoHub"
 $LOG       = Join-Path $PASTA_LOG "servidor.log"
 
+<#
+    Lê uma chave do .env da raiz (o mesmo arquivo que o app lê). Parser de
+    propósito simples: `CHAVE=valor`, aspas opcionais, `#` comenta a linha.
+#>
+function Ler-Env([string]$chave, [string]$padrao) {
+    $arquivo = Join-Path $RAIZ ".env"
+    if (Test-Path $arquivo) {
+        foreach ($linha in Get-Content $arquivo -Encoding UTF8) {
+            if ($linha -match "^\s*$chave\s*=\s*(.*?)\s*$") {
+                return $Matches[1].Trim('"', "'")
+            }
+        }
+    }
+    return $padrao
+}
+
+# O navegador do "Abrir no ...": cada máquina escolhe o seu no .env.
+$NAVEGADORES = @{
+    edge    = @{ Nome = "Edge";    Caminhos = @(
+        (Join-Path ${env:ProgramFiles(x86)} "Microsoft\Edge\Application\msedge.exe"),
+        (Join-Path $env:ProgramFiles        "Microsoft\Edge\Application\msedge.exe")) }
+    firefox = @{ Nome = "Firefox"; Caminhos = @(
+        (Join-Path $env:ProgramFiles        "Mozilla Firefox\firefox.exe"),
+        (Join-Path ${env:ProgramFiles(x86)} "Mozilla Firefox\firefox.exe"),
+        (Join-Path $env:LOCALAPPDATA        "Mozilla Firefox\firefox.exe")) }
+}
+$NAVEGADOR = $NAVEGADORES[(Ler-Env "NAVEGADOR" "edge").ToLower()]
+if (-not $NAVEGADOR) { $NAVEGADOR = $NAVEGADORES.edge }
+
 # ---------------------------------------------------------------------------
 # Uma instância só. Dois ícones na bandeja disputando a mesma porta não
 # ajudariam ninguém, e o segundo acharia que o servidor do primeiro é dele.
@@ -245,7 +274,7 @@ function Novo-Icone([bool]$apagado, [string]$selo) {
 
 $script:proc         = $null
 $script:desde        = Get-Date
-# Só o clique em "Abrir no Edge" liga isto. O navegador nunca abre por conta
+# Só o clique em "Abrir no <navegador>" liga isto. O navegador nunca abre por conta
 # própria: nem ao subir, nem ao adotar um servidor que já estava rodando.
 $script:abrirAoSubir = $false
 
@@ -299,13 +328,9 @@ function Parar-Servidor {
     for ($i = 0; $i -lt 30 -and (Porta-Ouvindo); $i++) { Start-Sleep -Milliseconds 100 }
 }
 
-<# O Edge, se estiver instalado; senão o navegador padrão do sistema. #>
+<# O navegador do .env (NAVEGADOR), se estiver instalado; senão o padrão do sistema. #>
 function Abrir-Navegador {
-    $candidatos = @(
-        (Join-Path ${env:ProgramFiles(x86)} "Microsoft\Edge\Application\msedge.exe"),
-        (Join-Path $env:ProgramFiles        "Microsoft\Edge\Application\msedge.exe")
-    )
-    foreach ($e in $candidatos) {
+    foreach ($e in $NAVEGADOR.Caminhos) {
         if (Test-Path $e) { Start-Process $e -ArgumentList $URL; return }
     }
     Start-Process $URL
@@ -417,7 +442,7 @@ $bandeja.Visible = $true
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 $bandeja.ContextMenuStrip = $menu
 
-$itemAbrir = $menu.Items.Add("Abrir no Edge")
+$itemAbrir = $menu.Items.Add("Abrir no $($NAVEGADOR.Nome)")
 $itemAbrir.Font = New-Object System.Drawing.Font($menu.Font, [System.Drawing.FontStyle]::Bold)
 $itemLink = $menu.Items.Add("Copiar link do tailnet")
 $itemCode =$menu.Items.Add("Abrir no VS Code")
